@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 EstiNova — Intelligent Centralized Assistant (AI ERP)
 
 > Projet Pluridisciplinaire · ESTIN 2025/2026  
@@ -203,3 +204,36 @@ EstiNova provides:
 
 🚧 Currently in development (Prototype stage)  
 🎯 Designed to scale into a production-ready ERP AI system
+=======
+# EstiNova - Portail Académique
+
+EstiNova est une application moderne et réactive pour la gestion académique de l'ESTIN Béjaïa. Elle centralise les emplois du temps, les résultats des examens et les documents administratifs sous une interface fluide et unifiée.
+
+## Installation et Développement
+
+### Prérequis
+- Node.js (version 18+)
+- Compte Supabase (optionnel, pour l'authentification des utilisateurs)
+
+### Procédure de lancement local
+
+1. Installez les dépendances du projet :
+   ```bash
+   npm install
+   ```
+
+2. Créez un fichier `.env.local` à la racine (en vous basant sur `.env.example`) et renseignez vos variables d'accès Supabase si nécessaire.
+
+3. Lancez le serveur de développement :
+   ```bash
+   npm run dev
+   ```
+
+Le portail sera disponible à l'adresse [http://localhost:3000](http://localhost:3000).
+
+## Déploiement
+
+Ce projet est configuré pour être déployé directement sur **Vercel** :
+- Les en-têtes de sécurité (CSP, HSTS, protection Clickjacking) sont configurés dans le fichier [vercel.json](./vercel.json).
+- Le proxy d'API sécurisé est déployé automatiquement via la fonction serverless dans [api/proxy-webhook.js](./api/proxy-webhook.js).
+>>>>>>> 9dd2532 (Update)

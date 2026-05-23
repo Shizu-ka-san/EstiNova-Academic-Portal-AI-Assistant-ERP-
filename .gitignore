@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # v0 sandbox internal files
 __v0_runtime_loader.js
 __v0_devtools.tsx
@@ -15,3 +16,13 @@ node_modules
 .next/
 .DS_Store
 .vercel
+=======
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+>>>>>>> 9dd2532 (Update)
