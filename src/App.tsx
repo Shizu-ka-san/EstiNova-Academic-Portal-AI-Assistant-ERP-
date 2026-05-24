@@ -444,16 +444,16 @@ export default function App() {
           <div className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-[var(--bg-input)]/50 select-none shadow-sm transition-all duration-250">
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${selectedRole === 'student' ? 'bg-indigo-400' :
-                  selectedRole === 'professor' ? 'bg-emerald-400' : 'bg-rose-400'
+                selectedRole === 'professor' ? 'bg-emerald-400' : 'bg-rose-400'
                 }`}></span>
               <span className={`relative inline-flex rounded-full h-2 w-2 ${selectedRole === 'student' ? 'bg-indigo-500' :
-                  selectedRole === 'professor' ? 'bg-emerald-500' : 'bg-rose-500'
+                selectedRole === 'professor' ? 'bg-emerald-500' : 'bg-rose-500'
                 }`}></span>
             </span>
             <span className="text-xs font-semibold text-[var(--text-muted)] tracking-wide">
               Mode actif :{' '}
               <span className={`font-mono font-extrabold transition-all ${selectedRole === 'student' ? 'text-indigo-300' :
-                  selectedRole === 'professor' ? 'text-emerald-300' : 'text-rose-300'
+                selectedRole === 'professor' ? 'text-emerald-300' : 'text-rose-300'
                 }`}>
                 {selectedRole === 'student' ? '🎓 ÉTUDIANT' :
                   selectedRole === 'professor' ? '💼 ENSEIGNANT' : '⚙️ ADMIN'}

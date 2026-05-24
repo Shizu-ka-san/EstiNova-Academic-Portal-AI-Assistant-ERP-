@@ -51,6 +51,7 @@ export default function ChatMessage({ message, isLastMessage, onRewrite, userAva
 
     try {
       if (AZURE_KEY === 'TA_CLE_AZURE_ICI') {
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'fr-FR';
         utterance.onend = () => setIsPlaying(false);
@@ -75,9 +76,10 @@ export default function ChatMessage({ message, isLastMessage, onRewrite, userAva
       audio.onended = () => setIsPlaying(false);
       audio.onerror = () => setIsPlaying(false);
       audio.play();
-    } catch (error) {
+      } catch (error) {
       console.error('Erreur de lecture TTS, essai du fallback Synthesizer:', error);
       try {
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'fr-FR';
         utterance.onend = () => setIsPlaying(false);

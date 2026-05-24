@@ -40,6 +40,14 @@ export default function ChatInput({
     }
   }, [externalInput, onExternalInputConsumed]);
 
+  const onSendRef = useRef(onSend);
+  const fileRef = useRef(file);
+  
+  useEffect(() => {
+    onSendRef.current = onSend;
+    fileRef.current = file;
+  }, [onSend, file]);
+
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -61,7 +69,7 @@ export default function ChatInput({
         setTimeout(() => {
           const val = textareaRef.current?.value;
           if (val && val.trim()) {
-            onSend(val, true, file, selectedRoleRef.current);
+            onSendRef.current(val, true, fileRef.current, selectedRoleRef.current);
             setInput('');
             setFile(null);
           }
@@ -73,7 +81,14 @@ export default function ChatInput({
         setIsListening(false);
       };
     }
-  }, [onSend, file]);
+    
+    // Clean up function
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
 
   const toggleMicrophone = () => {
     if (isListening) {
