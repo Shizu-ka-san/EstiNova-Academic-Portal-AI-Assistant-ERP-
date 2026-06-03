@@ -1,7 +1,5 @@
 # 🚀 EstiNova — Portail Académique & Assistant IA (ERP)
 
-![EstiNova Hero Banner](./assets/hero_banner_1780527687088.png)
-
 > **Projet Pluridisciplinaire · ESTIN (Amizour, Béjaïa, Algérie) 2025/2026**  
 > ⚠️ **Statut : En cours de développement (Prototype)**
 
@@ -15,8 +13,6 @@ Au lieu de naviguer entre plusieurs fichiers PDF, emails ou groupes de communica
 
 ### 💬 Interface Chat & Sélection de Rôle Dynamique
 L'utilisateur, une fois connecté sur le portail EstiNova, fait face à l'assistant IA et choisit activement le **rôle/workflow** (Étudiant, Enseignant, Administrateur) auquel envoyer sa requête directement via le sélecteur intégré dans la barre de saisie de l'interface de chat. Cela permet d'adapter instantanément les réponses de l'IA et de garantir une sécurité forte et ciblée.
-
-![EstiNova Chat Interface](./assets/chat_interface_1780527707757.png)
 
 ---
 
@@ -71,7 +67,7 @@ graph TD
     T_Agent & G_Agent & D_Agent -->|5. Données / Outils| Services
 ```
 
-![EstiNova Architecture Globale](./assets/architecture_diagram_1780527695973.png)
+![EstiNova Architecture Globale](./assets/architecture_diagram_1780528358298.png)
 
 ### 🔗 Fonctionnement des Connexions
 
@@ -102,6 +98,33 @@ Pour répondre de manière fiable et précise aux questions des étudiants et de
 ![EstiNova RAG Pipeline](./assets/rag_pipeline_1780527716891.png)
 
 ---
+
+## 📊 Conception & Modélisation (UML & Base de Données)
+
+Pour structurer le développement et garantir la cohérence des flux de données de la plateforme, plusieurs diagrammes de conception ont été élaborés :
+
+### 1. Diagramme de Cas d'Utilisation (Use Case)
+Ce diagramme détaille les interactions possibles entre les différents acteurs (Étudiant, Enseignant, Administrateur) et l'assistant IA EstiNova.
+
+![Diagramme de Cas d'Utilisation](./assets/use_case_diagrame.png)
+
+### 2. Diagramme de Séquence
+Il illustre la chronologie des échanges de messages lors de l'interaction de chat, passant du Frontend au proxy Vercel, puis à l'orchestrateur n8n et aux bases de données.
+
+![Diagramme de Séquence](./assets/diagram_sequence%20.png)
+
+### 3. Diagramme de Classes (UML)
+Ce diagramme présente la structure statique du système, la définition des entités (Utilisateurs, Profils, Plannings, Notes) et leurs relations.
+
+![Diagramme de Classes UML](./assets/class_diagramme%20.png)
+
+### 4. Schéma de la Base de Données (Supabase)
+Voici la structure relationnelle des tables hébergées sur Supabase pour la gestion de l'authentification et des profils utilisateurs.
+
+![Schéma Base de Données Supabase](./assets/supabase-schema-wohmumhqolkmkegmltml.png)
+
+---
+
 
 
 ## 🐳 Hébergement, Souveraineté & Mode Offline
