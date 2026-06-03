@@ -1,16 +1,16 @@
 # Dependency directories
-Web App/node_modules/
+webapp/node_modules/
 
 # Build outputs
-Web App/build/
-Web App/dist/
-Web App/.next/
-Web App/.vercel/
-Web App/server.js
+webapp/build/
+webapp/dist/
+webapp/.next/
+webapp/.vercel/
+webapp/server.js
 
 # Env files
-Web App/.env*
-!Web App/.env.example
+webapp/.env*
+!webapp/.env.example
 
 # Temporary / OS files
 .DS_Store

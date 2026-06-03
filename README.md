@@ -110,9 +110,9 @@ graph TD
    ```
 
 2. **Configurer l'application web** :
-   Allez dans le dossier `Web App` :
+   Allez dans le dossier `webapp` :
    ```bash
-   cd "Web App"
+   cd webapp
    ```
    Créez un fichier `.env.local` en vous basant sur `.env.example` et complétez les variables :
    ```env
