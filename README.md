@@ -142,7 +142,3 @@ graph TD
 
 - **Boudjaoui Badis** — Chef de Projet & Ingénieur IA  
 - **Chiheb Israa** — Ingénieur IA (Prompting & RAG)  
-- **Gougam Wiam** — Développeur Frontend  
-- **Mansouri Anias** — Développeur Backend  
-- **Hamadouche Axcel** — Analyste de Données  
-- **Naceri Walid** — Analyste de Données  
