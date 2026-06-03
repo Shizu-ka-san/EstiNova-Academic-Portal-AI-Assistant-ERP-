@@ -15,5 +15,18 @@ export default defineConfig(() => {
       port: 3000,
       host: true,
     },
+    build: {
+      chunkSizeWarningLimit: 800,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'ui-vendor': ['lucide-react', 'motion'],
+            'utils-vendor': ['marked', '@supabase/supabase-js'],
+          },
+        },
+      },
+    },
   };
 });
+
