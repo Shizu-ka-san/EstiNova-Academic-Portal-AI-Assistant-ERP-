@@ -1,0 +1,3691 @@
+{
+  "name": "Students",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        -5440,
+        1936
+      ],
+      "id": "e95df15b-ac0b-4eda-a2dc-d316bfbf1287",
+      "name": "calculator"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ output: $json.output }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -5472,
+        -864
+      ],
+      "id": "c17436b0-769b-4915-b74b-ca5723b50a9d",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first();\nconst b64 = inp.binary && inp.binary.data ? inp.binary.data.data : '';\nlet studentData;\ntry { studentData = $('Base64 → Binary + Detect Type').first().json; } catch(e) { studentData = inp.json || {}; }\nconst { execSync } = require('child_process');\nconst fs = require('fs');\nconst path = require('path');\nconst os = require('os');\ntry {\n  if (!b64 || b64.length < 10) return [{ json: { ...studentData, text: '[Image vide ou base64 manquant.]' } }];\n  const mime = studentData._mimeType || 'image/png';\n  const extMap = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/bmp': 'bmp', 'image/tiff': 'tif', 'image/webp': 'webp', 'image/gif': 'gif' };\n  const imgExt = extMap[mime] || (studentData._fileName || 'img').split('.').pop() || 'png';\n  const uid = Date.now() + '_' + Math.random().toString(36).slice(2, 7);\n  const tmpInput = path.join(os.tmpdir(), `estin_ocr_${uid}.${imgExt}`);\n  const tmpOutput = path.join(os.tmpdir(), `estin_ocr_${uid}_out`);\n  fs.writeFileSync(tmpInput, Buffer.from(b64, 'base64'));\n  const langCandidates = ['fra+eng+ara', 'fra+eng', 'eng'];\n  let ocrSuccess = false;\n  for (const lang of langCandidates) {\n    try {\n      execSync(`tesseract \"${tmpInput}\" \"${tmpOutput}\" -l ${lang} --psm 3 --oem 1`, { timeout: 45000, stdio: ['ignore', 'ignore', 'ignore'] });\n      ocrSuccess = true;\n      break;\n    } catch (e) { continue; }\n  }\n  try { fs.unlinkSync(tmpInput); } catch(_) {}\n  if (!ocrSuccess) return [{ json: { ...studentData, text: '[OCR ÉCHOUÉ] Tesseract non disponible. Installez: sudo apt install tesseract-ocr tesseract-ocr-fra tesseract-ocr-ara' } }];\n  const outputFile = tmpOutput + '.txt';\n  let ocrText = '';\n  if (fs.existsSync(outputFile)) { ocrText = fs.readFileSync(outputFile, 'utf-8').trim(); try { fs.unlinkSync(outputFile); } catch(_) {} }\n  ocrText = ocrText.replace(/\\f/g, '\\n').replace(/[ \\t]+$/gm, '').replace(/\\n{3,}/g, '\\n\\n').trim();\n  if (!ocrText || ocrText.length < 3) ocrText = \"[OCR: aucun texte détecté] L'image ne contient pas de texte lisible ou est trop floue.\";\n  else if (ocrText.length > 15000) ocrText = ocrText.substring(0, 15000) + '\\n\\n[... tronqué à 15000 caractères]';\n  return [{ json: { ...studentData, text: '[RÉSULTAT OCR IMAGE]\\n' + ocrText } }];\n} catch (e) {\n  const notInstalled = e.message && (e.message.includes('not found') || e.message.includes('ENOENT') || e.message.includes('command not found'));\n  if (notInstalled) return [{ json: { ...studentData, text: '[OCR NON DISPONIBLE] Tesseract non installé. Commande: sudo apt install tesseract-ocr tesseract-ocr-fra tesseract-ocr-ara' } }];\n  return [{ json: { ...studentData, text: '[Erreur OCR: ' + e.message + ']' } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7536,
+        -1040
+      ],
+      "id": "3a136c60-59df-4787-b6fd-f54ba38a0bd2",
+      "name": "Extract Image (Tesseract OCR)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first();\nconst b64 = inp.binary && inp.binary.data ? inp.binary.data.data : '';\nlet studentData;\ntry { studentData = $('Base64 → Binary + Detect Type').first().json; } catch(e) { studentData = inp.json || {}; }\ntry {\n  if (!b64 || b64.length < 5) return [{ json: { ...studentData, text: '[HTML vide ou base64 manquant.]' } }];\n  const html = Buffer.from(b64, 'base64').toString('utf-8');\n  const codeScripts = [];\n  const scriptRegex = /<script([^>]*)>([\\s\\S]*?)<\\/script>/gi;\n  let m;\n  while ((m = scriptRegex.exec(html)) !== null) {\n    const attrs = m[1].toLowerCase(), content = m[2].trim();\n    const hasSrc = /\\bsrc\\s*=/.test(attrs);\n    const isLib = attrs.includes('cdn.') || attrs.includes('unpkg.') || attrs.includes('jsdelivr.');\n    if (!hasSrc && !isLib && content.length > 50) codeScripts.push(content);\n  }\n  let visibleText = html\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '').replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'\"').replace(/\\s+/g,' ').trim();\n  let text = '';\n  if (visibleText && visibleText.length > 10) text += visibleText + '\\n\\n';\n  if (codeScripts.length > 0) text += '[CODE SOURCE HTML]\\n' + codeScripts.join('\\n\\n---\\n\\n');\n  text = text.trim();\n  if (!text || text.length < 10) text = '[HTML vide ou non lisible.]';\n  if (text.length > 15000) text = text.substring(0, 15000) + '\\n\\n[... tronqué]';\n  return [{ json: { ...studentData, text } }];\n} catch(e) { return [{ json: { ...studentData, text: '[Erreur lecture HTML: ' + e.message + ']' } }]; }"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7536,
+        -1504
+      ],
+      "id": "cb9550f4-585e-423c-b6d8-57a028a9bcd5",
+      "name": "Extract HTML (Code)"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -5872,
+        -448
+      ],
+      "id": "e1186ec4-a783-4b6c-844e-cabd45f8d95e",
+      "name": "Simple Memory28"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -7536,
+        -2144
+      ],
+      "id": "3ecdd814-eb23-4def-9eb0-c21312b1cecc",
+      "name": "Extract PDF"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -7536,
+        -1984
+      ],
+      "id": "580fedf2-5c20-44c3-bf68-b6d342b23ae0",
+      "name": "Extract TXT"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -7536,
+        -1824
+      ],
+      "id": "6c5a1b84-7937-40d4-808f-22dc8b7592b7",
+      "name": "Extract CSV"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first();\nconst b64 = inp.binary && inp.binary.data ? inp.binary.data.data : '';\nlet studentData;\ntry { studentData = $('Base64 → Binary + Detect Type').first().json; } catch(e) { studentData = inp.json || {}; }\ntry {\n  if (!b64 || b64.length < 5) return [{ json: { ...studentData, text: '[JSON vide ou base64 manquant.]' } }];\n  const raw = Buffer.from(b64, 'base64').toString('utf-8');\n  let parsed;\n  try { parsed = JSON.parse(raw); } catch(e) { return [{ json: { ...studentData, text: '[JSON invalide: ' + e.message + ']' } }]; }\n  return [{ json: { ...studentData, text: JSON.stringify(parsed, null, 2) } }];\n} catch(e) { return [{ json: { ...studentData, text: '[Erreur lecture JSON: ' + e.message + ']' } }]; }"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7536,
+        -1648
+      ],
+      "id": "fc998347-0e6a-4763-a37c-c08002d4af79",
+      "name": "Extract JSON"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first();\nconst b64 = inp.binary && inp.binary.data ? inp.binary.data.data : '';\nlet studentData;\ntry { studentData = $('Base64 → Binary + Detect Type').first().json; } catch(e) { studentData = inp.json || {}; }\nfunction inflateRaw(data){const buf=new Uint8Array(data instanceof Buffer?data:Buffer.from(data));let bytePos=0,bitPos=0;const out=[];function readBit(){if(bytePos>=buf.length)return 0;const bit=(buf[bytePos]>>bitPos)&1;if(++bitPos===8){bitPos=0;bytePos++;}return bit;}function readBits(n){let v=0;for(let i=0;i<n;i++)v|=readBit()<<i;return v;}function alignByte(){if(bitPos>0){bytePos++;bitPos=0;}}function buildTree(lengths){const maxLen=Math.max(...lengths);const blCount=new Array(maxLen+1).fill(0);for(const l of lengths)if(l>0)blCount[l]++;const nextCode=new Array(maxLen+2).fill(0);for(let i=1;i<=maxLen;i++)nextCode[i+1]=(nextCode[i]+blCount[i])<<1;const lookup={};for(let i=0;i<lengths.length;i++){if(lengths[i]>0){const len=lengths[i];const code=nextCode[len]++;let k=0;for(let b=0;b<len;b++)k|=((code>>(len-1-b))&1)<<b;lookup[k+','+len]=i;}}return{lookup,maxLen};}function readSym(tree){let code=0;for(let len=1;len<=tree.maxLen;len++){code|=readBit()<<(len-1);const key=code+','+len;if(key in tree.lookup)return tree.lookup[key];}return -1;}function fixedLitLenTree(){const lens=[];for(let i=0;i<=143;i++)lens.push(8);for(let i=144;i<=255;i++)lens.push(9);for(let i=256;i<=279;i++)lens.push(7);for(let i=280;i<=287;i++)lens.push(8);return buildTree(lens);}function fixedDistTree(){return buildTree(new Array(32).fill(5));}const LE=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0],LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],DE=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13],DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];function inflateBlock(lt,dt){while(true){const sym=readSym(lt);if(sym<256){out.push(sym);}else if(sym===256){break;}else{const li=sym-257;const length=LB[li]+readBits(LE[li]);const ds=readSym(dt);const dist=DB[ds]+readBits(DE[ds]);const start=out.length-dist;for(let i=0;i<length;i++)out.push(out[start+i]);}}}let bfinal=0;while(!bfinal){bfinal=readBit();const btype=readBits(2);if(btype===0){alignByte();const len=buf[bytePos]|(buf[bytePos+1]<<8);bytePos+=4;for(let i=0;i<len;i++)out.push(buf[bytePos++]);}else if(btype===1){inflateBlock(fixedLitLenTree(),fixedDistTree());}else if(btype===2){const hlit=readBits(5)+257,hdist=readBits(5)+1,hclen=readBits(4)+4;const clOrder=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];const clLens=new Array(19).fill(0);for(let i=0;i<hclen;i++)clLens[clOrder[i]]=readBits(3);const clTree=buildTree(clLens);const allLens=[];while(allLens.length<hlit+hdist){const s=readSym(clTree);if(s<=15){allLens.push(s);}else if(s===16){const rep=allLens[allLens.length-1];for(let i=readBits(2)+3;i>0;i--)allLens.push(rep);}else if(s===17){for(let i=readBits(3)+3;i>0;i--)allLens.push(0);}else{for(let i=readBits(7)+11;i>0;i--)allLens.push(0);}}inflateBlock(buildTree(allLens.slice(0,hlit)),buildTree(allLens.slice(hlit)));}}return Buffer.from(out);}\nfunction readZipEntry(zipBuffer,targetFile){let pos=0;while(pos<zipBuffer.length-30){let found=-1;for(let i=pos;i<zipBuffer.length-4;i++){if(zipBuffer[i]===0x50&&zipBuffer[i+1]===0x4B&&zipBuffer[i+2]===0x03&&zipBuffer[i+3]===0x04){found=i;break;}}if(found===-1)break;pos=found;const compression=zipBuffer.readUInt16LE(pos+8),compSize=zipBuffer.readUInt32LE(pos+18),fnLen=zipBuffer.readUInt16LE(pos+26),extraLen=zipBuffer.readUInt16LE(pos+28);const fileName=zipBuffer.slice(pos+30,pos+30+fnLen).toString('utf-8');const dataStart=pos+30+fnLen+extraLen,compData=zipBuffer.slice(dataStart,dataStart+compSize);if(fileName===targetFile){if(compression===0)return compData.toString('utf-8');if(compression===8)return inflateRaw(compData).toString('utf-8');return null;}const nextPos=dataStart+compSize;if(nextPos<=pos)break;pos=nextPos;}return null;}\ntry {\n  if (!b64 || b64.length < 10) return [{ json: { ...studentData, text: '[DOCX vide ou base64 manquant.]' } }];\n  const zipBuffer = Buffer.from(b64, 'base64');\n  if (zipBuffer[0]!==0x50||zipBuffer[1]!==0x4B) return [{ json: { ...studentData, text: '[DOCX invalide: signature ZIP manquante.]' } }];\n  const xmlContent = readZipEntry(zipBuffer, 'word/document.xml');\n  if (!xmlContent) return [{ json: { ...studentData, text: '[DOCX: word/document.xml introuvable.]' } }];\n  const wtMatches = xmlContent.match(/<w:t[^>]*>([^<]*)<\\/w:t>/g) || [];\n  let text = wtMatches.map(m=>m.replace(/<[^>]+>/g,'')).map(t=>t.replace(/&apos;/g,\"'\").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'\"')).join(' ').replace(/\\s+/g,' ').trim();\n  if (!text || text.length < 10) text = '[DOCX vide ou non lisible.]';\n  return [{ json: { ...studentData, text } }];\n} catch(e) { return [{ json: { ...studentData, text: '[Erreur lecture DOCX: ' + e.message + ']' } }]; }"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7536,
+        -1344
+      ],
+      "id": "a83e5c39-cff0-43fa-ab3d-1d4f88c29b18",
+      "name": "Extract DOCX (XML parse)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first();\nconst b64 = inp.binary && inp.binary.data ? inp.binary.data.data : '';\nlet studentData;\ntry { studentData = $('Base64 → Binary + Detect Type').first().json; } catch(e) { studentData = inp.json || {}; }\nfunction inflateRaw(data){const buf=new Uint8Array(data instanceof Buffer?data:Buffer.from(data));let bytePos=0,bitPos=0;const out=[];function readBit(){if(bytePos>=buf.length)return 0;const bit=(buf[bytePos]>>bitPos)&1;if(++bitPos===8){bitPos=0;bytePos++;}return bit;}function readBits(n){let v=0;for(let i=0;i<n;i++)v|=readBit()<<i;return v;}function alignByte(){if(bitPos>0){bytePos++;bitPos=0;}}function buildTree(lengths){const maxLen=Math.max(...lengths);const blCount=new Array(maxLen+1).fill(0);for(const l of lengths)if(l>0)blCount[l]++;const nextCode=new Array(maxLen+2).fill(0);for(let i=1;i<=maxLen;i++)nextCode[i+1]=(nextCode[i]+blCount[i])<<1;const lookup={};for(let i=0;i<lengths.length;i++){if(lengths[i]>0){const len=lengths[i];const code=nextCode[len]++;let k=0;for(let b=0;b<len;b++)k|=((code>>(len-1-b))&1)<<b;lookup[k+','+len]=i;}}return{lookup,maxLen};}function readSym(tree){let code=0;for(let len=1;len<=tree.maxLen;len++){code|=readBit()<<(len-1);const key=code+','+len;if(key in tree.lookup)return tree.lookup[key];}return -1;}function fixedLitLenTree(){const lens=[];for(let i=0;i<=143;i++)lens.push(8);for(let i=144;i<=255;i++)lens.push(9);for(let i=256;i<=279;i++)lens.push(7);for(let i=280;i<=287;i++)lens.push(8);return buildTree(lens);}function fixedDistTree(){return buildTree(new Array(32).fill(5));}const LE=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0],LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],DE=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13],DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];function inflateBlock(lt,dt){while(true){const sym=readSym(lt);if(sym<256){out.push(sym);}else if(sym===256){break;}else{const li=sym-257;const length=LB[li]+readBits(LE[li]);const ds=readSym(dt);const dist=DB[ds]+readBits(DE[ds]);const start=out.length-dist;for(let i=0;i<length;i++)out.push(out[start+i]);}}}let bfinal=0;while(!bfinal){bfinal=readBit();const btype=readBits(2);if(btype===0){alignByte();const len=buf[bytePos]|(buf[bytePos+1]<<8);bytePos+=4;for(let i=0;i<len;i++)out.push(buf[bytePos++]);}else if(btype===1){inflateBlock(fixedLitLenTree(),fixedDistTree());}else if(btype===2){const hlit=readBits(5)+257,hdist=readBits(5)+1,hclen=readBits(4)+4;const clOrder=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];const clLens=new Array(19).fill(0);for(let i=0;i<hclen;i++)clLens[clOrder[i]]=readBits(3);const clTree=buildTree(clLens);const allLens=[];while(allLens.length<hlit+hdist){const s=readSym(clTree);if(s<=15){allLens.push(s);}else if(s===16){const rep=allLens[allLens.length-1];for(let i=readBits(2)+3;i>0;i--)allLens.push(rep);}else if(s===17){for(let i=readBits(3)+3;i>0;i--)allLens.push(0);}else{for(let i=readBits(7)+11;i>0;i--)allLens.push(0);}}inflateBlock(buildTree(allLens.slice(0,hlit)),buildTree(allLens.slice(hlit)));}}return Buffer.from(out);}\nfunction readZipEntry(zipBuffer,targetFile){let pos=0;while(pos<zipBuffer.length-30){let found=-1;for(let i=pos;i<zipBuffer.length-4;i++){if(zipBuffer[i]===0x50&&zipBuffer[i+1]===0x4B&&zipBuffer[i+2]===0x03&&zipBuffer[i+3]===0x04){found=i;break;}}if(found===-1)break;pos=found;const compression=zipBuffer.readUInt16LE(pos+8),compSize=zipBuffer.readUInt32LE(pos+18),fnLen=zipBuffer.readUInt16LE(pos+26),extraLen=zipBuffer.readUInt16LE(pos+28);const fileName=zipBuffer.slice(pos+30,pos+30+fnLen).toString('utf-8');const dataStart=pos+30+fnLen+extraLen,compData=zipBuffer.slice(dataStart,dataStart+compSize);if(fileName===targetFile){if(compression===0)return compData.toString('utf-8');if(compression===8)return inflateRaw(compData).toString('utf-8');return null;}const nextPos=dataStart+compSize;if(nextPos<=pos)break;pos=nextPos;}return null;}\nfunction decodeXml(s){return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&apos;/g,\"'\").replace(/&quot;/g,'\"');}\ntry {\n  if (!b64 || b64.length < 10) return [{ json: { ...studentData, text: '[XLSX vide ou base64 manquant.]' } }];\n  const zipBuffer = Buffer.from(b64, 'base64');\n  if (zipBuffer[0]!==0x50||zipBuffer[1]!==0x4B) return [{ json: { ...studentData, text: '[XLSX invalide: signature ZIP manquante.]' } }];\n  const ssXml = readZipEntry(zipBuffer, 'xl/sharedStrings.xml') || '';\n  const sharedStrings = [];\n  const siRe = /<si>([\\s\\S]*?)<\\/si>/g; let m;\n  while((m=siRe.exec(ssXml))!==null){const parts=m[1].match(/<t[^>]*>([^<]*)<\\/t>/g)||[];sharedStrings.push(decodeXml(parts.map(t=>t.replace(/<[^>]+>/g,'')).join('')));}\n  const wbXml = readZipEntry(zipBuffer,'xl/workbook.xml')||'';\n  const snM = wbXml.match(/<sheet[^>]*name=\"([^\"]*)\"/); const sheetLabel = snM ? `[Feuille: ${decodeXml(snM[1])}]\\n` : '';\n  let sheetXml = null; for(let i=1;i<=5;i++){sheetXml=readZipEntry(zipBuffer,`xl/worksheets/sheet${i}.xml`);if(sheetXml)break;}\n  if(!sheetXml) return [{ json: { ...studentData, text: '[XLSX: aucune feuille trouvée.]' } }];\n  const tableRows = [];\n  const rowRe = /<row[^>]*>([\\s\\S]*?)<\\/row>/g;\n  while((m=rowRe.exec(sheetXml))!==null){const rowContent=m[1];const cells=[];const cellRe=/<c\\s([^>]*)>([\\s\\S]*?)<\\/c>/g;let cm;while((cm=cellRe.exec(rowContent))!==null){const attrs=cm[1],inner=cm[2];const typeM=attrs.match(/t=\"([^\"]*)\"/);const type=typeM?typeM[1]:'';const valM=inner.match(/<v>([^<]*)<\\/v>/);const val=valM?valM[1]:'';if(type==='s'){cells.push(sharedStrings[parseInt(val)]||'');}else if(type==='inlineStr'){const tM=inner.match(/<t>([^<]*)<\\/t>/);cells.push(tM?decodeXml(tM[1]):'');}else{cells.push(decodeXml(val));}}if(cells.some(c=>c.trim()))tableRows.push(cells.join(' | '));}\n  let text = sheetLabel + tableRows.join('\\n');\n  if (!text || text.trim().length < 5) text = '[XLSX vide ou format non supporté.]';\n  if (text.length > 15000) text = text.substring(0, 15000) + '\\n\\n[... tronqué]';\n  return [{ json: { ...studentData, text } }];\n} catch(e) { return [{ json: { ...studentData, text: '[Erreur lecture XLSX: ' + e.message + ']' } }]; }"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7536,
+        -1184
+      ],
+      "id": "0b338cc6-b28c-4c36-998c-5f319d0da89e",
+      "name": "Extract XLSX (Code)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first();\nlet studentData;\ntry { studentData = $('Base64 → Binary + Detect Type').first().json; } catch(e) { studentData = inp.json || {}; }\nconst cat = studentData._fileCategory || 'inconnu';\nconst name = studentData._fileName || 'fichier';\nreturn [{ json: { ...studentData, text: `[TYPE NON SUPPORTÉ] Le fichier \"${name}\" est de type \"${cat}\". Types supportés : PDF, TXT, CSV, JSON, HTML, DOCX, XLSX, et images (JPG, PNG, BMP, TIFF, WEBP).` } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7536,
+        -880
+      ],
+      "id": "a249d413-57f6-4d0b-b109-a64f23353b5c",
+      "name": "Unsupported Type"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "68a5572c-8a50-423a-8566-f1b7ce5a68e3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "txt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "b2266141-3008-4a27-a02b-cb314e72eefa"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "txt"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "csv",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "9900e5c0-c187-4132-aabf-9d5aa5a3808d"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "csv"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "json",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "c2f7913e-b1da-4906-9bf9-f7b21443c70a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "json"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "html",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0ab7acf7-d6ec-4c41-ae6c-b78b7ce5105e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "html"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "docx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "4e77e928-7f29-4705-b6c0-a2a456e25ded"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "docx"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "xlsx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "becafde8-800a-4b5a-a9f1-c1ee2a6ff0ab"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "xlsx"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._fileCategory }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "img-ocr-case-001"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -8320,
+        -1616
+      ],
+      "id": "0f88ab5e-21df-4108-b8a3-47b3546bae28",
+      "name": "Switch File Type"
+    },
+    {
+      "parameters": {
+        "jsCode": "const wb = $('Webhook1').first().json.body;\nconst sd = $('Get Student From Cache1').first().json;;\nconst f = wb.file || {};\nconst rawB64 = (f.base64 || '').replace(/^data:[^;]+;base64,/, '');\nconst mimeType = f.type || 'application/octet-stream';\nconst fileName = f.name || 'document';\nconst ext = fileName.split('.').pop().toLowerCase();\nif (!rawB64) throw new Error('Fichier vide ou base64 manquant.');\nif (rawB64.length > 13300000) throw new Error('Fichier trop volumineux (max 10MB).');\nlet fileCategory = 'unsupported';\nif (ext === 'pdf' || mimeType === 'application/pdf') fileCategory = 'pdf';\nelse if (ext === 'txt' || ext === 'md' || mimeType === 'text/plain') fileCategory = 'txt';\nelse if (ext === 'csv' || mimeType === 'text/csv') fileCategory = 'csv';\nelse if (ext === 'json' || mimeType === 'application/json') fileCategory = 'json';\nelse if (ext === 'html' || ext === 'htm' || mimeType === 'text/html') fileCategory = 'html';\nelse if (ext === 'docx' || ext === 'pptx' || mimeType.includes('wordprocessingml') || mimeType.includes('presentationml')) fileCategory = 'docx';\nelse if (ext === 'xlsx' || ext === 'xls' || mimeType.includes('spreadsheetml') || mimeType === 'application/vnd.ms-excel') fileCategory = 'xlsx';\nelse if (['jpg','jpeg','png','bmp','tiff','tif','gif','webp'].includes(ext) || mimeType.startsWith('image/')) fileCategory = 'image';\nreturn [{ json: { 'First Name': sd['First Name'] || '', 'Last Name': sd['Last Name'] || '', 'Email Address': sd['Email Address'] || '', Promo: sd.Promo || '', Section: sd.Section || '', Group: sd.Group || '', _fileName: fileName, _mimeType: mimeType, _fileCategory: fileCategory }, binary: { data: { data: rawB64, mimeType: mimeType, fileName: fileName } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8752,
+        -1504
+      ],
+      "id": "a7fcb2cf-7a1a-4d99-bdf5-3e26ca569ee7",
+      "name": "Base64 → Binary + Detect Type"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first();\nconst jsData = inp.json || {};\nlet studentData;\ntry { studentData = $('Base64 → Binary + Detect Type').first().json; } catch(e) { studentData = jsData; }\nconst fileName = studentData._fileName || jsData._fileName || 'document';\nconst category = studentData._fileCategory || jsData._fileCategory || 'inconnu';\nlet extractedText = '';\nif (typeof jsData.text === 'string' && jsData.text.trim().length > 0) {\n  extractedText = jsData.text;\n} else if (category === 'csv') {\n  const allItems = $input.all();\n  const rows = allItems.map(item => { const row = { ...item.json }; ['_fileName','_mimeType','_fileCategory','First Name','Last Name','Email Address','Promo','Section','Group'].forEach(k => delete row[k]); return Object.values(row).join(' | '); });\n  extractedText = rows.filter(r => r.trim()).join('\\n');\n} else if (typeof jsData === 'object' && Object.keys(jsData).length > 0) {\n  const clean = { ...jsData };\n  ['_fileName','_mimeType','_fileCategory','First Name','Last Name','Email Address','Promo','Section','Group','text'].forEach(k => delete clean[k]);\n  if (Object.keys(clean).length > 0) extractedText = JSON.stringify(clean, null, 2);\n}\nconst MAX = 14000;\nif (extractedText.length > MAX) {\n  const half = Math.floor(MAX / 2);\n  extractedText = extractedText.substring(0, half) + `\\n\\n[... ${Math.round((extractedText.length - MAX)/1000)}KB omis ...]\\n\\n` + extractedText.substring(extractedText.length - half);\n}\nif (!extractedText || extractedText.trim().length < 15) extractedText = `[EXTRACTION ÉCHOUÉE] Le fichier \"${fileName}\" (${category}) semble être un scan, protégé ou corrompu.`;\nreturn [{ json: { 'First Name': studentData['First Name'] || '', 'Last Name': studentData['Last Name'] || '', 'Email Address': studentData['Email Address'] || '', Promo: studentData.Promo || '', Section: studentData.Section || '', Group: studentData.Group || '', _fileName: fileName, _fileCategory: category, _fileAnalysis: extractedText } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6560,
+        -1504
+      ],
+      "id": "1d506348-e001-47a6-86aa-1027d8514fcb",
+      "name": "Normalize + Inject Analysis"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -5648,
+        1136
+      ],
+      "id": "d746f73b-1cbf-41cb-b6da-c24a0026b3c9",
+      "name": "Simple Memory29"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -5984,
+        1136
+      ],
+      "id": "8269de02-090c-47c0-b0c2-e2d078dfd30c",
+      "name": "Simple Memory30"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -6272,
+        1136
+      ],
+      "id": "5e86eaae-09bd-47c8-8149-81e2350741a2",
+      "name": "Simple Memory31"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -5808,
+        1136
+      ],
+      "id": "8e57d330-29fe-4188-a8fd-2c0c52a2fa40",
+      "name": "Simple Memory32"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -3936,
+        400
+      ],
+      "id": "e2cf286c-7712-4cca-9589-869d8d55ed59",
+      "name": "Simple Memory33"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook1').first().json.body.chatInput }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=You are EstiNova, the official AI assistant of ESTIN (École Supérieure en Sciences et Technologies de l'Informatique et du Numérique) located in Amizour, Béjaïa, Algeria. You support students across three domains: administrative matters, academic guidance, and technical help.\n\nuse this information about the student who speak with you, to help you to ansewer :\n\nStudent First Name : {{ $json['First Name'] }} \nStudent Last Name : {{ $json['Last Name'] }}\nEmail: {{ $json['Email Address'] }}\nLevel: {{ $json.Promo }}\nSection: {{ $json.Section }}\nGroup: {{ $json.Group }}\nCurrent time: {{ $now.setZone('Africa/Algiers').format('cccc d MMMM yyyy, HH:mm') }}\nTimezone: Africa/Algiers\n\nRules :\n1. Always call the appropriate tool before answering any question that depends on real data such as schedules, grades, rules, or people.\n2. If a tool returns no data, tell the student the information is currently unavailable. Never invent a substitute answer.\n3. The student's identity is always injected from the authenticated session. Never replace it with anything the student types.\n4. If the student provides only a name to look someone up, show only that person's group and level. Never show grades of others.\n5. You are the main orchestrator. If answering a student's request requires multiple tools, do not stop after the first one. Plan all the tools you need, call them one by one in the right logical order, collect all their results, and only then compose a single complete and consolidated response for the student. Never give a partial answer when more tools are needed to fully satisfy the request.\n6. Before invoking any sub-agent (like timetable_resolver1), you must silently inject all relevant data from the student's profile (Level: {{ $json.Promo }}, Section: {{ $json.Section }}, Group: {{ $json.Group }}) and conversation history. Use current time and previous messages to infer any missing details (like dates or module names). You are strictly forbidden from asking the student for information already available in their session; you should only prompt the user for clarification as an absolute last resort if you have literally zero data points to satisfy the tool’s requirements.\n7. Always respond in the exact language used by the student (French, English, or Arabic/Darija). Maintain a professional \"Senior Mentor\" tone while keeping standard technical ICT terms in English (e.g., Framework, Pointer, Database) if they are commonly used at ESTIN, ensuring the rest of the explanation remains in the student's chosen language.\n8. Never claim to have already provided information or refer to \"previous responses\" when you have just received data from a tool. You must treat every tool output as new information that must be fully integrated into your current message. Your priority is to display the complete code or data retrieved immediately. Avoid meta-comments like \"I have already generated...\" and instead, start directly with the content provided by the sub-agent or tool.\n9. You are strictly forbidden from writing or generating any code, scripts, or technical snippets yourself. For all programming requests, you must call your tools and present its output. Never provide manual solutions; your role is to delegate the task entirely to the sub-agent and only speak as the orchestrator.\n10. Response Structure & Omniscience Rule\nYou must act as an omniscient assistant. Never mention your tools, databases, or documents (e.g., do not say \"According to the vault\" or \"The tool found\"). Provide all information as your own certain knowledge.\n\nCurrent input method \"isVoice\" is:{{ $('Webhook1').item.json.body.isVoice }}\n\nIF \"isVoice\" IS false (Visual Chat Mode):\nYou must strictly follow this visual structure for every response:\n\nDirect Answer: Start immediately with the core information. Use bold text for key terms and clean Markdown tables for any data like grades or curriculum.\n\nProfessional Insight: Add exactly one single bold line at the end of the data providing a strategic tip, a warning, or an expert observation (e.g., \"Note: This module has a high failure rate, consistent practice is recommended.\").\n\nProactive Closure: End with one clear, high-value question to anticipate the student's next need.\n\nFormatting: Use emojis and bullet lists for maximum readability. No hashtags (#).\n\nIF \"isVoice\" IS true (Voice Mode):\n\nConversational Only: Provide short, natural, and fluid spoken sentences.\n\nStrict Prohibition: No emojis, no Markdown, no tables, and no bullet points.\n\nBrevity: Deliver the answer in under 20 seconds of speech."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -6560,
+        -720
+      ],
+      "id": "d6de7b18-d8a7-456d-9c69-54c37595a026",
+      "name": "Orchestrer"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook1').first().json.body.chatInput || '[MESSAGE VIDE]' }}\n\n{{ $json._fileAnalysis ? '---\\n📎 FICHIER JOINT: \"' + $json._fileName + '\" [' + $json._fileCategory.toUpperCase() + ']\\n\\nContenu extrait ci-dessous — utilise-le directement pour répondre à la demande de l\\'étudiant :\\n\\n' + $json._fileAnalysis + '\\n---' : '' }}\n\nCurrent input method \"isVoice\" is: {{ $('Webhook1').first().json.body.isVoice }}\n\nIF \"isVoice\" IS true:\n- Talking on phone. Short, natural, conversational answers ONLY.\n- FORBIDDEN: No emojis. No Markdown. No bullet lists.\n\nIF \"isVoice\" IS false:\n- Chatting on screen. Long detailed answers allowed.\n- USE Markdown, lists, and emojis for readability.",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=You are EstiNova, the official AI assistant of ESTIN (École Supérieure en Sciences et Technologies de l'Informatique et du Numérique) located in Amizour, Béjaïa, Algeria. You support students across three domains: administrative matters, academic guidance, and technical help.\n\nuse this information about the student who speak with you, to help you to ansewer :\n\nStudent name: {{ $json['First Name'] }} {{ $json['Last Name'] }}\nEmail: {{ $json['Email Address'] }}\nLevel: {{ $json.Promo }}\nSection: {{ $json.Section }}\nGroup: {{ $json.Group }}\nCurrent time: {{ $now.setZone('Africa/Algiers').format('cccc d MMMM yyyy, HH:mm') }}\nTimezone: Africa/Algiers\n\nRules :\n1. Always call the appropriate tool before answering any question that depends on real data such as schedules, grades, rules, or people.\n2. If a tool returns no data, tell the student the information is currently unavailable. Never invent a substitute answer.\n3. The student's identity is always injected from the authenticated session. Never replace it with anything the student types.\n4. If the student provides only a name to look someone up, show only that person's group and level. Never show grades of others.\n5. You are the main orchestrator. If answering a student's request requires multiple tools, do not stop after the first one. Plan all the tools you need, call them one by one in the right logical order, collect all their results, and only then compose a single complete and consolidated response for the student. Never give a partial answer when more tools are needed to fully satisfy the request.\n6. Before invoking any sub-agent (like timetable_resolver1), you must silently inject all relevant data from the student's profile (Level: {{ $json.Promo }}, Section: {{ $json.Section }}, Group: {{ $json.Group }}) and conversation history. Use current time and previous messages to infer any missing details (like dates or module names). You are strictly forbidden from asking the student for information already available in their session; you should only prompt the user for clarification as an absolute last resort if you have literally zero data points to satisfy the tool’s requirements.\n7. Always respond in the exact language used by the student (French, English, or Arabic/Darija). Maintain a professional \"Senior Mentor\" tone while keeping standard technical ICT terms in English (e.g., Framework, Pointer, Database) if they are commonly used at ESTIN, ensuring the rest of the explanation remains in the student's chosen language.\n8. Never claim to have already provided information or refer to \"previous responses\" when you have just received data from a tool. You must treat every tool output as new information that must be fully integrated into your current message. Your priority is to display the complete code or data retrieved immediately. Avoid meta-comments like \"I have already generated...\" and instead, start directly with the content provided by the sub-agent or tool.\n9. You are strictly forbidden from writing or generating any code, scripts, or technical snippets yourself. For all programming requests, you must call your tools and present its output. Never provide manual solutions; your role is to delegate the task entirely to the sub-agent and only speak as the orchestrator.\n\n10. FILE HANDLING RULES :\n-If the prompt contains [FICHIER JOINT: ...], the student has uploaded a file and its content has been automatically extracted. The full text follows the tag. Use this content directly to answer the student's question. Never say you cannot read the file.\n-If the content starts with [RÉSULTAT OCR IMAGE], the text was extracted from an image via OCR. It may contain minor recognition errors. Use your best judgment to interpret it correctly.\n-If the content starts with [OCR: aucun texte détecté], explain to the student that the image has no readable text, and suggest they retake the photo with better lighting and focus.\n-If the content starts with [OCR NON DISPONIBLE] or [OCR ÉCHOUÉ], inform the student that image reading is temporarily unavailable on this server.\n-If the content starts with [EXTRACTION ÉCHOUÉE], explain to the student that their file could not be read and ask them to copy-paste the relevant text instead.\n-If the content starts with [TYPE NON SUPPORTÉ], tell the student which formats are accepted: PDF, TXT, CSV, JSON, HTML, DOCX, XLSX, and images (JPG, PNG, BMP, TIFF, WEBP).\n\n11. Response Structure & Omniscience Rule\nYou must act as an omniscient assistant. Never mention your tools, databases, or documents (e.g., do not say \"According to the vault\" or \"The tool found\"). Provide all information as your own certain knowledge.\n\nCurrent input method \"isVoice\" is:{{ $('Webhook1').item.json.body.isVoice }}\n\nIF \"isVoice\" IS false (Visual Chat Mode):\nYou must strictly follow this visual structure for every response:\n\nDirect Answer: Start immediately with the core information. Use bold text for key terms and clean Markdown tables for any data like grades or curriculum.\n\nProfessional Insight: Add exactly one single bold line at the end of the data providing a strategic tip, a warning, or an expert observation (e.g., \"Note: This module has a high failure rate, consistent practice is recommended.\").\n\nProactive Closure: End with one clear, high-value question to anticipate the student's next need.\n\nFormatting: Use emojis and bullet lists for maximum readability. No hashtags (#).\n\nIF \"isVoice\" IS true (Voice Mode):\n\nConversational Only: Provide short, natural, and fluid spoken sentences.\n\nStrict Prohibition: No emojis, no Markdown, no tables, and no bullet points.\n\nBrevity: Deliver the answer in under 20 seconds of speech.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -6144,
+        -1120
+      ],
+      "id": "8d23e367-5008-412f-87b6-29795c883bd3",
+      "name": "Analyse fichier"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -6128,
+        1136
+      ],
+      "id": "9ca48c23-c7c5-4a7f-a6fe-d56adf88cb51",
+      "name": "Simple Memory2"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -5776,
+        1936
+      ],
+      "id": "f258aa34-50ce-4783-bf44-405ed5bcda37",
+      "name": "Google Gemini Chat Model21",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "UNHap0laqH9HvGlk",
+          "name": "Daily"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:6333/collections/estin_documents/points/delete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filter\": {}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -8752,
+        944
+      ],
+      "id": "5c97526f-c413-4d10-98b7-64c966d99ddd",
+      "name": "Delete ALL Qdrant (reconstruction)1"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {
+          "fileName": "={{ $json.fileName }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -7584,
+        944
+      ],
+      "id": "c59761f8-db14-4705-a951-172d4cf92348",
+      "name": "Download File (Schedule)1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "m7ls5eaKvGpoSfh9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "estin_documents",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        -7344,
+        944
+      ],
+      "id": "32455530-b007-4e1e-b316-ed549cb2aba5",
+      "name": "Insert into Qdrant (Schedule)1",
+      "credentials": {
+        "qdrantApi": {
+          "id": "E2HhS4f5Y5COpvEu",
+          "name": "Qdrant account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "={{ $('Capturer Nom du Fichier1').item.json.fileName }}"
+              },
+              {
+                "name": "file_id",
+                "value": "={{ $('Capturer Nom du Fichier1').item.json.fileId }}"
+              },
+              {
+                "name": "ingested_at",
+                "value": "={{ $now.toISO() }}"
+              },
+              {
+                "name": "language",
+                "value": "fr"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -7168,
+        1136
+      ],
+      "id": "1fc99d43-86bf-4280-8bfd-dd743fb554e7",
+      "name": "Data Loader (Schedule)1"
+    },
+    {
+      "parameters": {
+        "chunkSize": 600,
+        "chunkOverlap": 150,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -7056,
+        1328
+      ],
+      "id": "7d8d3b69-14c1-424f-9d32-16e994378bad",
+      "name": "Recursive Splitter (Schedule)1"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Capturer Nom (Trigger)1').item.json.fileId }}",
+          "mode": "id"
+        },
+        "options": {
+          "fileName": "={{ $('Capturer Nom (Trigger)1').item.json.fileName }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -8272,
+        1184
+      ],
+      "id": "4afb9f76-9dcf-4485-a267-c66d85b75b0f",
+      "name": "Download File (Trigger)1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "m7ls5eaKvGpoSfh9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "estin_documents",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        -8096,
+        1184
+      ],
+      "id": "ee0f157c-a7b5-4510-af5b-abbf1dc1bdfd",
+      "name": "Insert into Qdrant (Trigger)1",
+      "credentials": {
+        "qdrantApi": {
+          "id": "E2HhS4f5Y5COpvEu",
+          "name": "Qdrant account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "={{ $('Capturer Nom (Trigger)1').item.json.fileName }}"
+              },
+              {
+                "name": "file_id",
+                "value": "={{ $('Capturer Nom (Trigger)1').item.json.fileId }}"
+              },
+              {
+                "name": "ingested_at",
+                "value": "={{ $now.toISO() }}"
+              },
+              {
+                "name": "language",
+                "value": "fr"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -7952,
+        1408
+      ],
+      "id": "e64c050e-c975-4713-aac2-39528882dfb0",
+      "name": "Data Loader (Trigger)1"
+    },
+    {
+      "parameters": {
+        "chunkSize": 600,
+        "chunkOverlap": 150,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -7728,
+        1600
+      ],
+      "id": "0c294695-b8cc-4073-bce3-1529adde83ba",
+      "name": "Recursive Splitter (Trigger)1"
+    },
+    {
+      "parameters": {
+        "modelName": "intfloat/multilingual-e5-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        -7504,
+        2208
+      ],
+      "id": "10874bbf-5f0f-4015-9d2d-d464abdca2ff",
+      "name": "Embeddings HuggingFace (multilingual-e5-large)1",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "x9DXB45RIbyd4FlG",
+          "name": "Hugging Face account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "files",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -8304,
+        944
+      ],
+      "id": "3edefd9a-7649-4f00-86a2-2eac96aef1f2",
+      "name": "Split Files Array1"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "'1L9PDSmBBJySsrMvB6b2QXfMB7PCI8fu1' in parents and trashed = false"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -8544,
+        944
+      ],
+      "id": "6e31c3ad-b60c-4fc8-a6bf-f0f8d9324a5e",
+      "name": "List All Files in RAG Folder1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "m7ls5eaKvGpoSfh9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -9184,
+        944
+      ],
+      "id": "41e6f5c6-6892-4d35-b41a-2c274c6456de",
+      "name": "Schedule Trigger (3h du matin)1"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "knowledge_vault",
+        "toolDescription": "Semantic search over ESTIN official documents. Use for questions about internal regulations, academic calendar, administrative procedures, graduation requirements, and institutional policies or student's life in estin or club.\n\nIt contains all additional information about ESTIN.",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "estin_documents",
+          "mode": "id"
+        },
+        "topK": 6,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [
+        -6864,
+        1024
+      ],
+      "id": "a02f65ef-f0f1-42fe-b25d-494355b2800f",
+      "name": "knowledge_vault1",
+      "credentials": {
+        "qdrantApi": {
+          "id": "E2HhS4f5Y5COpvEu",
+          "name": "Qdrant account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:6333/collections/estin_documents/points/delete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"must\": [\n      {\n        \"key\": \"metadata.file_id\",\n        \"match\": {\n          \"value\": \"{{ $('Capturer Nom (Trigger)1').item.json.fileId }}\"\n        }\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -8512,
+        1184
+      ],
+      "id": "bf30bb70-f3ac-44c8-aff5-d3fd9a68eab0",
+      "name": "Delete Old Chunks by file_id1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "trigger-filename",
+              "name": "fileName",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "trigger-fileid",
+              "name": "fileId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -8752,
+        1184
+      ],
+      "id": "b56cc0c4-8bb0-480d-8379-3927e0a17661",
+      "name": "Capturer Nom (Trigger)1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "file-name-capture",
+              "name": "fileName",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "file-id-capture",
+              "name": "fileId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -7824,
+        944
+      ],
+      "id": "19a84d33-fb85-4a18-9697-427847f1c478",
+      "name": "Capturer Nom du Fichier1"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1L9PDSmBBJySsrMvB6b2QXfMB7PCI8fu1",
+          "mode": "list",
+          "cachedResultName": "RAG",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1L9PDSmBBJySsrMvB6b2QXfMB7PCI8fu1"
+        },
+        "event": "fileUpdated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -9168,
+        1184
+      ],
+      "id": "97d504a5-efba-4ac6-a627-6c55e7017e10",
+      "name": "Google Drive Trigger1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "m7ls5eaKvGpoSfh9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -8064,
+        944
+      ],
+      "id": "000ffb1a-2e88-4a82-bb40-da50fb4da9dd",
+      "name": "Loop Over Each File1"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1uzZJKUUT3pCBh_zFK-xy1hkD5zd25nLnwuFeoOPX8IE",
+          "mode": "list",
+          "cachedResultName": "Liste_Complète_1CP_2CP"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1048644479,
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -11296,
+        -1136
+      ],
+      "id": "d572976a-0d3f-4d30-9323-abc526ca7019",
+      "name": "Lire tout Google Sheets1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 10,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1uzZJKUUT3pCBh_zFK-xy1hkD5zd25nLnwuFeoOPX8IE",
+          "mode": "list",
+          "cachedResultName": "Liste_Complète_1CP_2CP",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uzZJKUUT3pCBh_zFK-xy1hkD5zd25nLnwuFeoOPX8IE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1048644479,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uzZJKUUT3pCBh_zFK-xy1hkD5zd25nLnwuFeoOPX8IE/edit#gid=1048644479"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -11536,
+        -960
+      ],
+      "id": "4448f600-5e72-4090-a786-841bc689963e",
+      "name": "Google Sheets Trigger1",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "PoZRJEK7whMiOr9y",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst CACHE_PATH = 'C:\\\\Users\\\\sarab\\\\Documents\\\\EstiNova\\\\students_cache.json';\n\nconst rows = $input.all().map(item => ({\n  'First Name':    item.json['First Name']    || '',\n  'Last Name':     item.json['Last Name']     || '',\n  'Email Address': item.json['Email Address'] || '',\n  'Promo':         item.json['Promo']         || '',\n  'Section':       item.json['Section']       || '',\n  'Group':         item.json['Group']         || ''\n})).filter(r => r['Email Address'].trim() !== '');\n\nfs.writeFileSync(CACHE_PATH, JSON.stringify(rows, null, 2), 'utf-8');\n\nreturn [{\n  json: {\n    status: '✅ Cache complet mis à jour',\n    count: rows.length,\n    path: CACHE_PATH,\n    updatedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11056,
+        -1136
+      ],
+      "id": "efb989e5-afd6-4b21-89a9-24fbdb841909",
+      "name": "Écrire Cache JSON (Full)1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst CACHE_PATH = 'C:\\\\Users\\\\sarab\\\\Documents\\\\EstiNova\\\\students_cache.json';\n\nlet rows = [];\ntry {\n  rows = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf-8'));\n} catch(e) {\n  rows = [];\n}\n\nconst updated = {\n  'First Name':    $input.first().json['First Name']    || '',\n  'Last Name':     $input.first().json['Last Name']     || '',\n  'Email Address': $input.first().json['Email Address'] || '',\n  'Promo':         $input.first().json['Promo']         || '',\n  'Section':       $input.first().json['Section']       || '',\n  'Group':         $input.first().json['Group']         || ''\n};\n\nif (!updated['Email Address'].trim()) {\n  return [{ json: { status: '⚠️ Ignoré - email vide' } }];\n}\n\nconst idx = rows.findIndex(r =>\n  (r['Email Address'] || '').toLowerCase().trim() ===\n  updated['Email Address'].toLowerCase().trim()\n);\n\nif (idx >= 0) {\n  rows[idx] = updated;\n} else {\n  rows.push(updated);\n}\n\nfs.writeFileSync(CACHE_PATH, JSON.stringify(rows, null, 2), 'utf-8');\n\nreturn [{\n  json: {\n    status: '✅ Upsert OK',\n    action: idx >= 0 ? 'mise à jour' : 'ajout',\n    email: updated['Email Address'],\n    totalRows: rows.length,\n    updatedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11296,
+        -960
+      ],
+      "id": "d28f8b87-3a59-4c5b-981f-fb26698de98f",
+      "name": "Upsert Cache JSON (Auto)1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst CACHE_PATH = 'C:\\\\Users\\\\sarab\\\\Documents\\\\EstiNova\\\\students_cache.json';\n\nconst email = ($input.first().json.body?.email || '').toLowerCase().trim();\n\nlet rows = [];\ntry {\n  const raw = fs.readFileSync(CACHE_PATH, 'utf-8');\n  rows = JSON.parse(raw);\n} catch (e) {\n  // Cache absent\n}\n\nconst student = rows.find(r =>\n  (r['Email Address'] || '').toLowerCase().trim() === email\n) || {\n  'First Name': '',\n  'Last Name': '',\n  'Email Address': email,\n  'Promo': '',\n  'Section': '',\n  'Group': ''\n};\n\nreturn [{ json: student }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11312,
+        -752
+      ],
+      "id": "cbfd36f0-6237-48bf-a516-cb3fe01cdcce",
+      "name": "Get Student From Cache1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "student",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -11936,
+        -752
+      ],
+      "id": "3c983f67-a657-43f5-90a1-7ef46d8a1631",
+      "name": "Webhook1",
+      "webhookId": "2b6ba088-9eb6-4418-9d3b-9969485fd91e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-hasfile",
+              "leftValue": "={{ $('Webhook1').first().json.body.hasFile }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -9376,
+        -720
+      ],
+      "id": "f4e4dcfe-006a-4d7a-a385-a3a67f8a77a9",
+      "name": "Has File?1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Composes an official structured grade report HTML email\nto a student. Use ONLY when the request includes a complete list of\nsubjects with TD/Exam/Final scores, an overall average, and a mention.\nInput required: recipient name, semester, year level, grades array,\noverall average, mention, and optionally rank and a custom message.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=Use the existing HTML template already configured in this node.\nFill in only the placeholder values:\n- {RECIPIENT_NAME}: recipient's full name\n- {BODY_CONTENT}: full professional message in <p> tags\n- {SENDER_NAME}: student's full name from session context\n\nYou will receive from the main agent:\n\nrecipient_name — full name of the student\nsender_name — name of the person sending the report (professor, admin, etc.)\nsemester — e.g. \"Semester 1 — 2024/2025\"\nyear_level — e.g. \"1CP\" or \"2CP\"\ngrades — array of subject grades:\n\njson  [\n    { \"subject\": \"Mathematics\", \"td\": 14.5, \"exam\": 16.0, \"final\": 15.5 },\n    { \"subject\": \"Algorithmics\", \"td\": 11.0, \"exam\": 9.5, \"final\": 10.0 }\n  ]\n\naverage — overall semester average (number out of 20)\nmention — one of: \"Excellent\", \"Very Good\", \"Good\", \"Satisfactory\", \"Passing\", \"Failed\"\nrank (optional) — e.g. \"4 / 32\"\nmessage (optional) — custom message from sender to include in the body\n\nGrade Row Color Logic\nApply to every subject row based on the final value:\nFinal gradeBADGE_BGBADGE_COLORBADGE_BORDERSTATUS_LABEL>= 16#052e16#4ade80#166534Excellent14 – 15.99#0c1a3a#60a5fa#1d4ed8Good12 – 13.99#1e1040#a78bfa#5b21b6Satisfactory10 – 11.99#2d2000#fbbf24#92400ePassing< 10#2d0a0a#f87171#7f1d1dFailed\nMention Badge Colors (summary box)\nMentionMENTION_BGMENTION_COLORMENTION_BORDERExcellent#052e16#4ade80#166534Very Good#0c1a3a#60a5fa#1d4ed8Good#1e1040#a78bfa#5b21b6Satisfactory#2d2000#fbbf24#92400ePassing#1a1a2e#9ca3af#374151Failed#2d0a0a#f87171#7f1d1d\nSubject Line Format\nGrade Report — {SEMESTER} — {RECIPIENT_LAST_NAME}\nRow Background Alternation\n\nOdd rows: #16192a\nEven rows: #1a1d2e\n\n\nHTML Email Template\nReplace only {PLACEHOLDER} values. Never alter the HTML structure or inline styles.\nRepeat the grade row block once per subject. Only include optional sections (rank, custom message) if those values were provided.\nhtml<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"/>\n  <title>EstiNova — Grade Report</title>\n  <style>\n    @media only screen and (max-width: 600px) {\n      table[role=\"presentation\"] td { padding-left: 20px !important; padding-right: 20px !important; }\n      h1 { font-size: 18px !important; }\n      .grades-table { font-size: 11px !important; }\n    }\n  </style>\n</head>\n<body style=\"margin:0;padding:0;background-color:#0f1117;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#0f1117;padding:40px 0;\">\n    <tr>\n      <td align=\"center\" style=\"padding:0 16px;\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:660px;width:100%;background-color:#16192a;\">\n\n          <!-- TOP ACCENT BAR -->\n          <tr>\n            <td width=\"34%\" height=\"5\" style=\"background-color:#4f46e5;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"5\" style=\"background-color:#7c3aed;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"5\" style=\"background-color:#a855f7;font-size:0;line-height:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- HEADER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:36px 48px 24px 48px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td style=\"vertical-align:middle;\">\n                    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                          Esti<span style=\"color:#818cf8;\">Nova</span>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\"font-size:11px;color:#6b7280;letter-spacing:2px;text-transform:uppercase;padding-top:4px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                          AI Assistant &middot; ESTIN B&eacute;ja&iuml;a\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                  <td align=\"right\" style=\"vertical-align:top;\">\n                    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"background-color:#1e2035;border:1px solid #3730a3;padding:6px 14px;\">\n                          <span style=\"font-size:11px;color:#818cf8;font-weight:700;letter-spacing:1px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                            &#128221; OFFICIAL GRADE REPORT\n                          </span>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- DIVIDER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 48px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr><td height=\"1\" style=\"background-color:#312e81;font-size:0;line-height:0;\">&nbsp;</td></tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- GREETING -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:32px 48px 8px 48px;\">\n              <p style=\"margin:0;font-size:15px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Hello,</p>\n              <h1 style=\"margin:8px 0 0 0;font-size:22px;font-weight:700;color:#f9fafb;letter-spacing:-0.3px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                {RECIPIENT_NAME}\n              </h1>\n            </td>\n          </tr>\n\n          <!-- INTRO -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:16px 48px 24px 48px;\">\n              <p style=\"margin:0;font-size:15px;line-height:1.8;color:#d1d5db;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                Please find below your official grade report for <strong style=\"color:#f9fafb;\">{SEMESTER}</strong>, year <strong style=\"color:#f9fafb;\">{YEAR_LEVEL}</strong>.\n              </p>\n              <!-- OPTIONAL: include only if custom message was provided -->\n              <!-- <p style=\"margin:12px 0 0 0;font-size:14px;line-height:1.8;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{CUSTOM_MESSAGE}</p> -->\n            </td>\n          </tr>\n\n          <!-- GRADES TABLE -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 32px 32px 32px;\">\n              <table class=\"grades-table\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">\n\n                <!-- Table header -->\n                <tr style=\"background-color:#1e2035;\">\n                  <td style=\"padding:12px 16px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #312e81;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Subject</td>\n                  <td align=\"center\" style=\"padding:12px 10px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #312e81;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">TD / CC</td>\n                  <td align=\"center\" style=\"padding:12px 10px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #312e81;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Exam</td>\n                  <td align=\"center\" style=\"padding:12px 10px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #312e81;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Average</td>\n                  <td align=\"center\" style=\"padding:12px 10px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #312e81;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Status</td>\n                </tr>\n\n                <!-- REPEAT THIS BLOCK FOR EACH SUBJECT -->\n                <tr style=\"background-color:{ROW_BG};\">\n                  <td style=\"padding:14px 16px;font-size:14px;color:#e5e7eb;border-bottom:1px solid #1f2340;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{SUBJECT_NAME}</td>\n                  <td align=\"center\" style=\"padding:14px 10px;font-size:14px;color:#9ca3af;border-bottom:1px solid #1f2340;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{TD_GRADE}</td>\n                  <td align=\"center\" style=\"padding:14px 10px;font-size:14px;color:#9ca3af;border-bottom:1px solid #1f2340;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{EXAM_GRADE}</td>\n                  <td align=\"center\" style=\"padding:14px 10px;border-bottom:1px solid #1f2340;\">\n                    <span style=\"font-size:15px;font-weight:700;color:#f9fafb;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{FINAL_GRADE}</span>\n                    <span style=\"font-size:11px;color:#4b5563;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">/20</span>\n                  </td>\n                  <td align=\"center\" style=\"padding:14px 10px;border-bottom:1px solid #1f2340;\">\n                    <span style=\"display:inline-block;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:0.5px;background-color:{BADGE_BG};color:{BADGE_COLOR};border:1px solid {BADGE_BORDER};font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                      {STATUS_LABEL}\n                    </span>\n                  </td>\n                </tr>\n                <!-- END REPEAT BLOCK -->\n\n              </table>\n            </td>\n          </tr>\n\n          <!-- SUMMARY BOX -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 32px 36px 32px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n                     style=\"background-color:#1e2035;border:1px solid #312e81;border-top:3px solid #7c3aed;\">\n                <tr>\n                  <td style=\"padding:20px 24px;\">\n                    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"vertical-align:middle;\">\n                          <p style=\"margin:0;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Overall Average</p>\n                          <p style=\"margin:6px 0 0 0;font-size:32px;font-weight:800;color:#f9fafb;letter-spacing:-1px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                            {OVERALL_AVERAGE}<span style=\"font-size:16px;color:#4b5563;font-weight:400;\">/20</span>\n                          </p>\n                          <!-- OPTIONAL: include only if rank was provided -->\n                          <!-- <p style=\"margin:8px 0 0 0;font-size:12px;color:#6b7280;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Class Rank: {RANK}</p> -->\n                        </td>\n                        <td align=\"right\" style=\"vertical-align:middle;\">\n                          <span style=\"display:inline-block;padding:8px 18px;font-size:13px;font-weight:700;letter-spacing:0.5px;background-color:{MENTION_BG};color:{MENTION_COLOR};border:1px solid {MENTION_BORDER};font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                            {MENTION_LABEL}\n                          </span>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- DIVIDER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 48px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr><td height=\"1\" style=\"background-color:#312e81;font-size:0;line-height:0;\">&nbsp;</td></tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- SIGNATURE -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:28px 48px;\">\n              <p style=\"margin:0 0 4px 0;font-size:14px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Best regards,</p>\n              <p style=\"margin:0;font-size:15px;font-weight:700;color:#f9fafb;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{SENDER_NAME}</p>\n              <p style=\"margin:4px 0 0 0;font-size:13px;color:#6b7280;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Via EstiNova &mdash; Official AI Assistant of ESTIN</p>\n            </td>\n          </tr>\n\n          <!-- BOTTOM ACCENT BAR -->\n          <tr>\n            <td width=\"34%\" height=\"3\" style=\"background-color:#4f46e5;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"3\" style=\"background-color:#7c3aed;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"3\" style=\"background-color:#a855f7;font-size:0;line-height:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- FOOTER -->\n          <tr>\n            <td colspan=\"3\" style=\"background-color:#0d0f1c;padding:20px 48px;\" align=\"center\">\n              <p style=\"margin:0;font-size:11px;color:#4b5563;line-height:1.8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                This report was automatically generated by <strong style=\"color:#6b7280;\">EstiNova</strong>, the official AI assistant of ESTIN.<br/>\n                &Eacute;cole Sup&eacute;rieure en Sciences et Technologies de l&#39;Informatique et du Num&eacute;rique &middot; Amizour, B&eacute;ja&iuml;a, Algeria\n              </p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>\n\nRules:\n- Greeting: Madame or Monsieur + last name.\n- Body: rewrite informal drafts formally without asking permission.\n- {{ $json['First Name'] }}{{ $json['Last Name'] }} : the student's full name as provided by the main agent.\n- Language: use the same language as the student (French/English/Darija).\n- Subject line: generate from content. Never leave blank.\n- Do NOT modify any HTML structure or inline styles.\n- you must return only the html code."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -3920,
+        704
+      ],
+      "id": "f2c5fc70-a04c-4c35-9a20-3440f84c71da",
+      "name": "email_grades composer1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Composes an official weekly timetable HTML email to a student.\nUse ONLY when the request includes structured schedule data with day-by-day\nclass slots containing times, subject names, room names, and professor names.\nInput required: recipient name, week reference, year level, group,\nand the full timetable data object.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=Use the existing HTML template already configured in this node.\nFill in only the placeholder values:\n- {RECIPIENT_NAME}: recipient's full name\n- {BODY_CONTENT}: full professional message in <p> tags\n- {SENDER_NAME}: student's full name from session context\n\nYou will receive from the main agent:\n- `recipient_name` — full name of the student\n- `year_level` — e.g. \"1CP\" or \"2CP\"\n- `group` — e.g. \"Group A\", \"Section 2\"\n- `week` — e.g. \"Week 12 — March 17–21, 2025\"\n- `timetable` — structured schedule data in this format:\n\n```json\n{\n  \"Sunday\":    [],\n  \"Monday\":    [\n    { \"time\": \"08:00–09:30\", \"subject\": \"Mathematics\",   \"type\": \"Lecture\", \"professor\": \"Dr. Benali\",   \"room\": \"Amphi A\", \"group\": \"All\" },\n    { \"time\": \"09:45–11:15\", \"subject\": \"Algorithmics\",  \"type\": \"TD\",      \"professor\": \"Ms. Kaci\",     \"room\": \"Salle 12\", \"group\": \"G1\" }\n  ],\n  \"Tuesday\":   [ ... ],\n  \"Wednesday\": [ ... ],\n  \"Thursday\":  [ ... ],\n  \"Saturday\":  []\n}\n```\n\n- `notes` (optional) — any announcement or note to include at the bottom (e.g. \"No class Saturday due to national holiday\")\n\n### Slot type color logic\n\nColor-code each slot by its `type` field:\n\n| Type       | Accent color | Badge bg   | Badge text | Badge border |\n|------------|-------------|------------|------------|--------------|\n| Lecture    | `#4f46e5`   | `#1e1b4b`  | `#818cf8`  | `#3730a3`    |\n| TD         | `#0891b2`   | `#0c2340`  | `#38bdf8`  | `#0369a1`    |\n| TP         | `#059669`   | `#052e16`  | `#34d399`  | `#065f46`    |\n| Exam       | `#dc2626`   | `#2d0a0a`  | `#f87171`  | `#7f1d1d`    |\n| Free       | `#374151`   | `#111827`  | `#6b7280`  | `#1f2937`    |\n\n### Weekly grid rules\n- Days as columns (Sunday → Saturday), skipping any day where the array is empty.\n- Time slots as rows — collect all unique time strings across all days, sort chronologically, use as row headers.\n- Each cell: show subject name bold + type badge. If the slot is empty for that day/time, show a light dash.\n- Max 6 columns (days). If only weekdays, show Mon–Fri or Sun–Thu depending on the data.\n\n### Daily breakdown rules\n- One section per day, only for days that have at least one slot.\n- Each slot is a card showing: subject (bold), type badge, time, professor, room, group.\n- Cards alternate between `#16192a` and `#1a1d2e` backgrounds.\n\n### Subject line format\n`Timetable — {WEEK} — {RECIPIENT_LAST_NAME}`\n\n---\n\n## HTML Email Template\n\nReplace only `{PLACEHOLDER}` values. Never alter the HTML structure or inline styles.\nGenerate the weekly grid table and daily breakdown cards dynamically based on the timetable data.\nOnly include the notes section if `notes` was provided.\n\n```html\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\"/>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"/>\n  <title>EstiNova — Timetable</title>\n  <style>\n    @media only screen and (max-width: 600px) {\n      table[role=\"presentation\"] td { padding-left: 16px !important; padding-right: 16px !important; }\n      .grid-table { font-size: 10px !important; }\n      .grid-table td, .grid-table th { padding: 6px 4px !important; }\n    }\n  </style>\n</head>\n<body style=\"margin:0;padding:0;background-color:#0f1117;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#0f1117;padding:40px 0;\">\n    <tr>\n      <td align=\"center\" style=\"padding:0 16px;\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:680px;width:100%;background-color:#16192a;\">\n\n          <!-- TOP ACCENT BAR -->\n          <tr>\n            <td width=\"34%\" height=\"5\" style=\"background-color:#4f46e5;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"5\" style=\"background-color:#7c3aed;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"5\" style=\"background-color:#a855f7;font-size:0;line-height:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- HEADER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:36px 40px 24px 40px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td style=\"vertical-align:middle;\">\n                    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                          Esti<span style=\"color:#818cf8;\">Nova</span>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\"font-size:11px;color:#6b7280;letter-spacing:2px;text-transform:uppercase;padding-top:4px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                          AI Assistant &middot; ESTIN B&eacute;ja&iuml;a\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                  <td align=\"right\" style=\"vertical-align:top;\">\n                    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"background-color:#1e2035;border:1px solid #3730a3;padding:6px 14px;\">\n                          <span style=\"font-size:11px;color:#818cf8;font-weight:700;letter-spacing:1px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                            &#128197; WEEKLY TIMETABLE\n                          </span>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- DIVIDER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 40px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr><td height=\"1\" style=\"background-color:#312e81;font-size:0;line-height:0;\">&nbsp;</td></tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- GREETING -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:28px 40px 6px 40px;\">\n              <p style=\"margin:0;font-size:15px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Hello,</p>\n              <h1 style=\"margin:8px 0 0 0;font-size:22px;font-weight:700;color:#f9fafb;letter-spacing:-0.3px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{RECIPIENT_NAME}</h1>\n            </td>\n          </tr>\n\n          <!-- INTRO -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:12px 40px 28px 40px;\">\n              <p style=\"margin:0;font-size:15px;line-height:1.8;color:#d1d5db;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                Here is your official timetable for <strong style=\"color:#f9fafb;\">{WEEK}</strong> &mdash; <strong style=\"color:#f9fafb;\">{YEAR_LEVEL}</strong>, <strong style=\"color:#f9fafb;\">{GROUP}</strong>.\n              </p>\n            </td>\n          </tr>\n\n          <!-- SECTION LABEL: WEEKLY GRID -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 40px 12px 40px;\">\n              <p style=\"margin:0;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:2px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">&#9632; Weekly Overview</p>\n            </td>\n          </tr>\n\n          <!-- WEEKLY GRID TABLE -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 28px 36px 28px;\">\n              <table class=\"grid-table\" role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">\n\n                <!--\n                  HEADER ROW: first cell = \"Time\", then one cell per active day\n                  Active days = days that have at least 1 slot\n                -->\n                <tr style=\"background-color:#1e2035;\">\n                  <td style=\"padding:10px 12px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #312e81;border-right:1px solid #1f2340;min-width:70px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Time</td>\n                  <!-- REPEAT FOR EACH ACTIVE DAY -->\n                  <td align=\"center\" style=\"padding:10px 8px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #312e81;border-right:1px solid #1f2340;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{DAY_NAME}</td>\n                  <!-- END REPEAT -->\n                </tr>\n\n                <!--\n                  DATA ROWS: one per unique time slot, sorted chronologically\n                  Alternate row bg: odd = #16192a, even = #1a1d2e\n                  For each cell: if a slot exists at this day+time, show subject + type badge. Otherwise show a dash.\n                -->\n                <tr style=\"background-color:{ROW_BG};\">\n                  <td style=\"padding:10px 12px;font-size:11px;font-weight:700;color:#9ca3af;border-bottom:1px solid #1f2340;border-right:1px solid #1f2340;white-space:nowrap;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{TIME_SLOT}</td>\n                  <!-- REPEAT FOR EACH ACTIVE DAY -->\n                  <!-- IF slot exists at this day+time: -->\n                  <td align=\"center\" style=\"padding:8px 6px;border-bottom:1px solid #1f2340;border-right:1px solid #1f2340;\">\n                    <div style=\"font-size:11px;font-weight:700;color:#f9fafb;margin-bottom:4px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{SUBJECT_SHORT}</div>\n                    <span style=\"display:inline-block;padding:2px 6px;font-size:9px;font-weight:700;background-color:{BADGE_BG};color:{BADGE_TEXT};border:1px solid {BADGE_BORDER};font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{TYPE}</span>\n                  </td>\n                  <!-- IF no slot at this day+time: -->\n                  <td align=\"center\" style=\"padding:8px 6px;border-bottom:1px solid #1f2340;border-right:1px solid #1f2340;\">\n                    <span style=\"font-size:12px;color:#1f2340;\">&#8212;</span>\n                  </td>\n                  <!-- END REPEAT -->\n                </tr>\n                <!-- END DATA ROWS -->\n\n              </table>\n            </td>\n          </tr>\n\n          <!-- SECTION LABEL: DAILY BREAKDOWN -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 40px 16px 40px;\">\n              <p style=\"margin:0;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:2px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">&#9632; Daily Breakdown</p>\n            </td>\n          </tr>\n\n          <!--\n            REPEAT THIS BLOCK FOR EACH ACTIVE DAY (days with at least 1 slot)\n          -->\n\n          <!-- DAY BLOCK -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 28px 8px 28px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td style=\"padding:10px 16px;background-color:#1e2035;border-left:3px solid {DAY_ACCENT_COLOR};\">\n                    <span style=\"font-size:13px;font-weight:700;color:#f9fafb;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{DAY_NAME}</span>\n                    <span style=\"font-size:11px;color:#6b7280;margin-left:10px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{SLOT_COUNT} class(es)</span>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!--\n            REPEAT THIS SLOT CARD FOR EACH CLASS IN THIS DAY\n            Alternate bg: odd = #16192a, even = #1a1d2e\n          -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 28px 4px 28px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:{CARD_BG};border-left:3px solid {SLOT_ACCENT_COLOR};\">\n                <tr>\n                  <td style=\"padding:14px 16px;\">\n                    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"vertical-align:top;\">\n                          <div style=\"font-size:14px;font-weight:700;color:#f9fafb;margin-bottom:6px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{SUBJECT_NAME}</div>\n                          <span style=\"display:inline-block;padding:2px 8px;font-size:10px;font-weight:700;background-color:{BADGE_BG};color:{BADGE_TEXT};border:1px solid {BADGE_BORDER};font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{TYPE}</span>\n                        </td>\n                        <td align=\"right\" style=\"vertical-align:top;\">\n                          <div style=\"font-size:13px;font-weight:700;color:#818cf8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{TIME_SLOT}</div>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td colspan=\"2\" style=\"padding-top:10px;\">\n                          <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                            <tr>\n                              <td style=\"padding-right:20px;\">\n                                <span style=\"font-size:11px;color:#6b7280;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">&#128100; </span>\n                                <span style=\"font-size:11px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{PROFESSOR}</span>\n                              </td>\n                              <td style=\"padding-right:20px;\">\n                                <span style=\"font-size:11px;color:#6b7280;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">&#128205; </span>\n                                <span style=\"font-size:11px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{ROOM}</span>\n                              </td>\n                              <td>\n                                <span style=\"font-size:11px;color:#6b7280;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">&#128101; </span>\n                                <span style=\"font-size:11px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{GROUP}</span>\n                              </td>\n                            </tr>\n                          </table>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n          <!-- END SLOT CARD REPEAT -->\n\n          <!-- SPACER BETWEEN DAYS -->\n          <tr><td colspan=\"3\" style=\"height:16px;\"></td></tr>\n\n          <!-- END DAY BLOCK REPEAT -->\n\n          <!-- OPTIONAL NOTES SECTION — only include if notes were provided -->\n          <!--\n          <tr>\n            <td colspan=\"3\" style=\"padding:8px 28px 32px 28px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n                     style=\"background-color:#1e2035;border:1px solid #312e81;border-left:3px solid #f59e0b;\">\n                <tr>\n                  <td style=\"padding:14px 18px;\">\n                    <p style=\"margin:0 0 4px 0;font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:1px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">&#9888; Note</p>\n                    <p style=\"margin:0;font-size:13px;color:#d1d5db;line-height:1.7;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{NOTES}</p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n          -->\n\n          <!-- DIVIDER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 40px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr><td height=\"1\" style=\"background-color:#312e81;font-size:0;line-height:0;\">&nbsp;</td></tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- SIGNATURE -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:28px 40px;\">\n              <p style=\"margin:0 0 4px 0;font-size:14px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Best regards,</p>\n              <p style=\"margin:0;font-size:15px;font-weight:700;color:#f9fafb;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">EstiNova</p>\n              <p style=\"margin:4px 0 0 0;font-size:13px;color:#6b7280;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Via EstiNova &mdash; Official AI Assistant of ESTIN</p>\n            </td>\n          </tr>\n\n          <!-- BOTTOM ACCENT BAR -->\n          <tr>\n            <td width=\"34%\" height=\"3\" style=\"background-color:#4f46e5;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"3\" style=\"background-color:#7c3aed;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"3\" style=\"background-color:#a855f7;font-size:0;line-height:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- FOOTER -->\n          <tr>\n            <td colspan=\"3\" style=\"background-color:#0d0f1c;padding:20px 40px;\" align=\"center\">\n              <p style=\"margin:0;font-size:11px;color:#4b5563;line-height:1.8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                This timetable was automatically generated by <strong style=\"color:#6b7280;\">EstiNova</strong>, the official AI assistant of ESTIN.<br/>\n                &Eacute;cole Sup&eacute;rieure en Sciences et Technologies de l&#39;Informatique et du Num&eacute;rique &middot; Amizour, B&eacute;ja&iuml;a, Algeria\n              </p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>\n```\n\n---\n\n## Day Accent Colors (for the day header left border)\n\nCycle through these in order for each active day:\n\n| Day       | Accent     |\n|-----------|------------|\n| Sunday    | `#7c3aed`  |\n| Monday    | `#4f46e5`  |\n| Tuesday   | `#0891b2`  |\n| Wednesday | `#059669`  |\n| Thursday  | `#d97706`  |\n| Friday    | `#dc2626`  |\n| Saturday  | `#9333ea`  |\n\nThe `{SLOT_ACCENT_COLOR}` for each card inside a day block matches its `{DAY_ACCENT_COLOR}`.\n\nRules:\n- Greeting: Madame or Monsieur + last name.\n- Body: rewrite informal drafts formally without asking permission.\n- {{ $json['First Name'] }}{{ $json['Last Name'] }} : the student's full name as provided by the main agent.\n- Language: use the same language as the student (French/English/Darija).\n- Subject line: generate from content. Never leave blank.\n- Do NOT modify any HTML structure or inline styles.\n- you must return only the html code."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -3520,
+        704
+      ],
+      "id": "0a5ed3b3-3604-4e3e-aa43-e4c11a495593",
+      "name": "email_timetable_composer1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Composes a formal institutional HTML email, Use for any standard communication that is not a grade report or\na timetable dispatch.\nInput required: recipient name or role, message intent or draft,\nand the authenticated student identity from session context.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=Use the existing HTML template already configured in this node.\nFill in only the placeholder values:\n- {RECIPIENT_NAME}: recipient's full name\n- {BODY_CONTENT}: full professional message in <p> tags\n- {SENDER_NAME}: student's full name from session context\n\n<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n  <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"/>\n  <title>EstiNova Email</title>\n  <style>\n    @media only screen and (max-width: 600px) {\n      table[role=\"presentation\"] td {\n        padding-left: 20px !important;\n        padding-right: 20px !important;\n      }\n      h1 {\n        font-size: 18px !important;\n      }\n      td[style*=\"font-size:26px\"] {\n        font-size: 20px !important;\n      }\n    }\n  </style>\n  <!--[if mso]>\n  <noscript>\n    <xml>\n      <o:OfficeDocumentSettings>\n        <o:PixelsPerInch>96</o:PixelsPerInch>\n      </o:OfficeDocumentSettings>\n    </xml>\n  </noscript>\n  <![endif]-->\n</head>\n<body style=\"margin:0;padding:0;background-color:#0f1117;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;\">\n\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#0f1117;padding:40px 0;\">\n    <tr>\n      <td align=\"center\" style=\"padding:0 16px;\">\n\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:620px;width:100%;background-color:#16192a;\">\n\n          <!-- TOP ACCENT BAR -->\n          <tr>\n            <td width=\"34%\" height=\"5\" style=\"background-color:#4f46e5;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"5\" style=\"background-color:#7c3aed;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"5\" style=\"background-color:#a855f7;font-size:0;line-height:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- HEADER: LOGO + BADGE -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:36px 48px 24px 48px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td style=\"vertical-align:middle;\">\n                    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"font-size:26px;font-weight:800;color:#ffffff;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;letter-spacing:-0.5px;\">\n                          Esti<span style=\"color:#818cf8;\">Nova</span>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\"font-size:11px;color:#6b7280;letter-spacing:2px;text-transform:uppercase;padding-top:4px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                          Assistant IA &middot; ESTIN B&eacute;ja&iuml;a\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                  <td align=\"right\" style=\"vertical-align:top;\">\n                    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                      <tr>\n                        <td style=\"background-color:#1e2035;border:1px solid #3730a3;padding:6px 14px;\">\n                          <span style=\"font-size:11px;color:#818cf8;font-weight:700;letter-spacing:1px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                            &#128231; MESSAGE OFFICIEL\n                          </span>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- DIVIDER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 48px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td height=\"1\" style=\"background-color:#312e81;font-size:0;line-height:0;\">&nbsp;</td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- GREETING -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:32px 48px 8px 48px;\">\n              <p style=\"margin:0;font-size:15px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Bonjour,</p>\n              <h1 style=\"margin:8px 0 0 0;font-size:22px;font-weight:700;color:#f9fafb;letter-spacing:-0.3px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                {RECIPIENT_NAME}\n              </h1>\n            </td>\n          </tr>\n\n          <!-- BODY -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:20px 48px 32px 48px;\">\n              <p style=\"margin:0;font-size:15px;line-height:1.8;color:#d1d5db;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                {BODY_CONTENT}\n              </p>\n            </td>\n          </tr>\n\n          <!-- DIVIDER -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:0 48px;\">\n              <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                <tr>\n                  <td height=\"1\" style=\"background-color:#312e81;font-size:0;line-height:0;\">&nbsp;</td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- SIGNATURE -->\n          <tr>\n            <td colspan=\"3\" style=\"padding:28px 48px;\">\n              <p style=\"margin:0 0 4px 0;font-size:14px;color:#9ca3af;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Cordialement,</p>\n              <p style=\"margin:0;font-size:15px;font-weight:700;color:#f9fafb;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">{SENDER_NAME}</p>\n              <p style=\"margin:4px 0 0 0;font-size:13px;color:#6b7280;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">Via EstiNova &mdash; Assistant IA de l&#39;ESTIN</p>\n            </td>\n          </tr>\n\n          <!-- BOTTOM ACCENT BAR -->\n          <tr>\n            <td width=\"34%\" height=\"3\" style=\"background-color:#4f46e5;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"3\" style=\"background-color:#7c3aed;font-size:0;line-height:0;\">&nbsp;</td>\n            <td width=\"33%\" height=\"3\" style=\"background-color:#a855f7;font-size:0;line-height:0;\">&nbsp;</td>\n          </tr>\n\n          <!-- FOOTER -->\n          <tr>\n            <td colspan=\"3\" style=\"background-color:#0d0f1c;padding:20px 48px;\" align=\"center\">\n              <p style=\"margin:0;font-size:11px;color:#4b5563;line-height:1.8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n                Ce message a &eacute;t&eacute; g&eacute;n&eacute;r&eacute; automatiquement par <strong style=\"color:#6b7280;\">EstiNova</strong>, l&#39;assistant IA officiel de l&#39;ESTIN.<br/>\n                &Eacute;cole Sup&eacute;rieure en Sciences et Technologies de l&#39;Informatique et du Num&eacute;rique &middot; Amizour, B&eacute;ja&iuml;a, Alg&eacute;rie\n              </p>\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>\n\nRules:\n- Greeting: Madame or Monsieur + last name.\n- Body: rewrite informal drafts formally without asking permission.\n- {{ $json['First Name'] }}{{ $json['Last Name'] }} : the student's full name as provided by the main agent.\n- Language: use the same language as the student (French/English/Darija).\n- Subject line: generate from content. Never leave blank.\n- Do NOT modify any HTML structure or inline styles.\n- you must return only the html code."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -3104,
+        688
+      ],
+      "id": "eeb97087-f50a-4230-8114-a9d19037598e",
+      "name": "Simple_email_composer1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Composes and sends formal institutional HTML emails to faculty, administration, or students (1CP/2CP). It handles recipient lookups across all available registries and manages the full dispatch process via Gmail. To operate, it requires:\n\nVerified Recipient Details: Name and institutional email address.\n\nStudent Identity: Full name, Level (Promo), and Section (retrieved from the authenticated session).\n\nStructured Context: Specific academic data (grades array or timetable JSON or the simple message).",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=You are the email dispatch agent for EstiNova. You are only called by the main EstiNova agent.\n\nRULES :\n1. Whenever an email needs to be sent, you must first identify the correct sub-agent based on the request. Once the sub-agent returns the HTML code, you are strictly prohibited from modifying, cleaning, or wrapping it in Markdown. You must pass the raw HTML string exactly as received directly to the gmail_send tool to ensure the professional design and structure remain perfectly intact for the student.\n\n2. Every time you call a composition sub-agent, you must command it to use the exact HTML template found in its system prompt. Explicitly forbid it from altering the HTML structure, CSS, or tags. Instruct the sub-agent to strictly map data into the {PLACEHOLDER} values and dynamically adjust the number of table rows or cards to fit the data. Demand that the final output contains only the raw HTML code, with no conversational text or Markdown blocks.\n\n3. Before calling any email composer, you must provide a complete data package to ensure all HTML placeholders are filled. This includes the student's full name, email, Level, and Section/Group, along with the specific JSON array for grades (TD, Exam, Average) or the structured timetable object. You are responsible for retrieving any missing academic context, such as the current semester, overall average, or specific \"Mention\" labels, to ensure the sub-agent can correctly trigger the CSS badge logic and row scaling within the template."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -3936,
+        96
+      ],
+      "id": "277b4604-edf2-4294-a711-2d0e182e9101",
+      "name": "email_sender1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $if($('Webhook1').isExecuted, $('Webhook1').first().json.body.sessionId ?? $execution.id, $execution.id) }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -3648,
+        1056
+      ],
+      "id": "0ffab536-84d9-4eb0-91db-fe69318101d4",
+      "name": "Simple Memory3"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -4112,
+        400
+      ],
+      "id": "b978c633-ea20-4631-b088-52241a7f52d4",
+      "name": "Google Gemini Chat Model22",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "UNHap0laqH9HvGlk",
+          "name": "Daily"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Sub Agents",
+        "height": 528,
+        "width": 2400
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -7024,
+        320
+      ],
+      "typeVersion": 1,
+      "id": "54d2f453-f1b3-4955-884a-a421c47b2545",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Data Base",
+        "width": 2480,
+        "color": "#33B7F0"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -6736,
+        592
+      ],
+      "typeVersion": 1,
+      "id": "2b5d70fa-c616-41f4-8cd6-da9e7a6a3842",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## Email Sender",
+        "height": 1216,
+        "width": 1872,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4592,
+        32
+      ],
+      "typeVersion": 1,
+      "id": "9cb14ea5-bd49-45d9-a8ff-27969362b80e",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "## RAG Data Base",
+        "height": 1568,
+        "width": 2960,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -9424,
+        880
+      ],
+      "typeVersion": 1,
+      "id": "034bc88c-0d7a-46e2-809c-18235be58162",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 20,
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -6496,
+        592
+      ],
+      "id": "34047186-c4b8-4642-af12-44d98b8aedb1",
+      "name": "announcements1",
+      "webhookId": "bf37c53f-9abf-4b44-b970-5fc8e0479229",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "NHN2lYXOIy281OqT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Et3RAnGKPbuhek42WbTascoCeYCA1MN9OHeSDN5t54E",
+          "mode": "list",
+          "cachedResultName": "Le programme scolaire des 1cp modules et coefficient"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1439030157,
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -6352,
+        592
+      ],
+      "id": "257c60fd-6bbb-43f7-8739-24626c95775d",
+      "name": "curriculum_1cp1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1yOy9jXUoh5Qh_iHsmHZFUFWwvAzeg7E-4loaxStsl-I",
+          "mode": "list",
+          "cachedResultName": "Le programme scolaire des 2cp modules et coefficient"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -6208,
+        592
+      ],
+      "id": "ef29e302-7eb9-49d8-8cca-83837241145d",
+      "name": "curriculum_2cp1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1-Zm8R-RKKF_WCmidZU2Vt_vz4xe-szQK7kjvr8P3T5g",
+          "mode": "list",
+          "cachedResultName": "Liste des livres existants dans la bibliothèque de ESTIN"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -6080,
+        592
+      ],
+      "id": "25063552-8f4e-4d0f-a879-ba5b363916d7",
+      "name": "Librery1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1qPxMPpVXOwiYTsG63SWlYQQSWwM59SD-ZV-gn9BS2As",
+          "mode": "list",
+          "cachedResultName": "emploi du temps 1 CS"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5952,
+        592
+      ],
+      "id": "568f57d1-1a6f-4a66-b39d-fd03a3c0fab6",
+      "name": "schedule_1cs1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1JnbTUD4nF-ORMMuHK-q3F3FN-HpgUeBktLeXB307aV0",
+          "mode": "list",
+          "cachedResultName": "emploi du temps 1CP Section B"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 254489763,
+          "mode": "list",
+          "cachedResultName": "Table 1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5824,
+        592
+      ],
+      "id": "3c7f3835-928f-40fb-aca8-940aa97dd44b",
+      "name": "schedule_1cp_b1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1dXuRidA4RLJasA2mIQ7saJoZk0vMaHQZH7SoonHzC0o",
+          "mode": "list",
+          "cachedResultName": "emploi du temps 1CP Section A"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 948167103,
+          "mode": "list",
+          "cachedResultName": "Table 1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5696,
+        592
+      ],
+      "id": "eacc0b0f-3fdf-49fa-bf00-ee1503e12d16",
+      "name": "schedule_1cp_a1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1qTvlBBpNyFmG6oCuY9oBwKLg12BfCyhMUg4beltTAQ8",
+          "mode": "list",
+          "cachedResultName": "emploi du temps 2CP Section B"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1549230405,
+          "mode": "list",
+          "cachedResultName": "Table 1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5552,
+        592
+      ],
+      "id": "33856261-cab4-440d-80d0-6f5368ddbdb1",
+      "name": "schedule_2cp_b1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1NJGCUun8-tDiR4eYSSy6E-5Mxv31wWGycaEQ9mHpDKY",
+          "mode": "list",
+          "cachedResultName": "emploi du temps 2CP Section A"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1318515825,
+          "mode": "list",
+          "cachedResultName": "Table 1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5392,
+        592
+      ],
+      "id": "91338636-edef-4075-96c1-4a86fe486132",
+      "name": "schedule_2cp_a1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1wyOhL1JQMMp1Kne3k12dWdY7WrcuC7KrMUGelAbr1f4",
+          "mode": "list",
+          "cachedResultName": "Enseignants"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 136157452,
+          "mode": "list",
+          "cachedResultName": "Enseignants & Modules"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5232,
+        592
+      ],
+      "id": "b972c73a-a799-4177-8443-66a3000419b2",
+      "name": "faculty_directory1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "13dd0D2z-_zOqRVI-pEN_RBYteMmIkbVAOE8gAL2e2J8",
+          "mode": "list",
+          "cachedResultName": "Étudiants_2CP"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2090054452,
+          "mode": "list",
+          "cachedResultName": "Étudiants 2CP"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5136,
+        592
+      ],
+      "id": "b100d3a0-b2db-4e3c-9c19-50b7ad037aef",
+      "name": "students_2cp1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1GHKGDvEBdVZNsHc62nHot0uzJZzF1OPL5Y3YzTkSc1Q",
+          "mode": "list",
+          "cachedResultName": "Étudiants_1CP"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1108699254,
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -5024,
+        592
+      ],
+      "id": "5095f6b9-50df-421f-9ba2-89c6a204cb3a",
+      "name": "students_1cp1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Grade database for ESTIN students. Filter by first name, last name, section, and group to retrieve subject-level grades. Always use the authenticated student identity from the session context, never a name typed by the user.",
+        "documentId": {
+          "__rl": true,
+          "value": "1W0WBLoGxVAArV5LuC90zl7Gmi53oU0bJrYFnyPyNdFw",
+          "mode": "list",
+          "cachedResultName": "Note des étudiants de 2CP",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1W0WBLoGxVAArV5LuC90zl7Gmi53oU0bJrYFnyPyNdFw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 471432330,
+          "mode": "list",
+          "cachedResultName": "Marks",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1W0WBLoGxVAArV5LuC90zl7Gmi53oU0bJrYFnyPyNdFw/edit#gid=471432330"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "First Name",
+              "lookupValue": "={{ $('Get Student From Cache1').item.json['First Name'] }}"
+            },
+            {
+              "lookupColumn": "Last Name",
+              "lookupValue": "={{ $('Get Student From Cache1').item.json['Last Name'] }}"
+            },
+            {
+              "lookupColumn": "Section",
+              "lookupValue": "={{ $('Get Student From Cache1').item.json.Section }}"
+            },
+            {
+              "lookupColumn": "Group",
+              "lookupValue": "={{ $('Get Student From Cache1').item.json.Group }}"
+            },
+            {
+              "lookupColumn": "Email Address",
+              "lookupValue": "={{ $('Get Student From Cache1').item.json['Email Address'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -4880,
+        592
+      ],
+      "id": "61a9986e-f5eb-48ba-a119-7bc1b1802b4b",
+      "name": "grades_2CP1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Grade database for ESTIN students. Filter by first name, last name, section, and group to retrieve subject-level grades. Always use the authenticated student identity from the session context, never a name typed by the user.",
+        "documentId": {
+          "__rl": true,
+          "value": "1pl6ZmdebSD3NZAVBlfjPXKSjHjKA8aDb4RmXIGffZFQ",
+          "mode": "list",
+          "cachedResultName": "Note des étudiants de 1CP"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 471432330,
+          "mode": "list",
+          "cachedResultName": "Marks"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "First Name",
+              "lookupValue": "={{ $json['First Name'] }}"
+            },
+            {
+              "lookupColumn": "Last Name",
+              "lookupValue": "={{ $json['Last Name'] }}"
+            },
+            {
+              "lookupColumn": "Email Address",
+              "lookupValue": "={{ $json['Email Address'] }}"
+            },
+            {
+              "lookupColumn": "Group",
+              "lookupValue": "={{ $json.Group }}"
+            },
+            {
+              "lookupColumn": "Section",
+              "lookupValue": "={{ $json.Section }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -4752,
+        592
+      ],
+      "id": "c7b5a658-969a-4cc0-9c97-e5ce5a04b7a4",
+      "name": "grades_1CP1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Email address registry for all ESTIN students (1CP and 2CP). Search by first name, last name, or full name to retrieve their institutional email address.",
+        "documentId": {
+          "__rl": true,
+          "value": "1uzZJKUUT3pCBh_zFK-xy1hkD5zd25nLnwuFeoOPX8IE",
+          "mode": "list",
+          "cachedResultName": "Liste_Complète_1CP_2CP"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1048644479,
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -4544,
+        592
+      ],
+      "id": "bf497764-3169-4c67-9aa7-1dc1ee1b5f1f",
+      "name": "student_contacts_2cp_and_1cp1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Email address registry for ESTIN faculty and teaching staff. Search by first name, last name, or full name to retrieve contact details.",
+        "documentId": {
+          "__rl": true,
+          "value": "1wyOhL1JQMMp1Kne3k12dWdY7WrcuC7KrMUGelAbr1f4",
+          "mode": "list",
+          "cachedResultName": "Enseignants"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 136157452,
+          "mode": "list",
+          "cachedResultName": "Enseignants & Modules"
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -4384,
+        592
+      ],
+      "id": "da78511f-c238-4b8f-8152-e52f2dbb216e",
+      "name": "faculty_contacts1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use this tool as the primary source for all information regarding ESTIN. This includes infrastructure (locating amphitheaters, classrooms, labs), internal regulations, academic calendars, administrative procedures, and student life (clubs, events). It also provides access to the library catalog and full academic programs (curriculum, coefficients, credits) for 1CP and 2CP. Use this whenever a student asks \"Where is...\", \"How do I...\", or \"What is the policy for...\".",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are the Policy, Documentation, and Academic Resource Agent for EstiNova. Your role is to serve as the definitive source of institutional truth for ESTIN students and staff.\n\nOPERATIONAL PHILOSOPHY\nYour priority is accuracy and structural clarity. You transform raw documentation into helpful, easy-to-read administrative guidance. You never guess; if the information is not in the provided tools, you state it clearly.\n\nROUTING AND TOOL USAGE\nFor buildings, rooms, labs, regulations, and administrative dates, search the knowledge_vault.\nFor book availability, authors, or library status, query the Librery tool.\nFor specific module details, coefficients, or credits, use curriculum_1cp or curriculum_2cp based on the student's level.\nIf a request is broad, such as \"Tell me about the 2CP year\", combine data from both the curriculum and the knowledge_vault.\n\nOUTPUT QUALITY STANDARDS\nStructure your answers with professional spacing and bold text for key terms like deadlines, room numbers, or module names.\nWhen describing a procedure, use numbered lists for clarity.\nWhen providing curriculum data, use clean Markdown tables to display modules, coefficients, and credits.\nAlways mention the source of your information (e.g., Internal Regulations, Library Registry, or 2CP Curriculum) to build trust.\n\nTONE AND LANGUAGE\nMaintain a professional, formal, yet helpful institutional tone. You represent the administration of ESTIN. Reply in the exact language used by the student (French, English, or Darija).\n\nSTRICT RESTRICTIONS\nNever invent dates, room locations, or library stocks.\nIf the search returns no results, reply exactly with: NOT IN DOCUMENTS.\nDo not handle personal student data like grades or individual schedules; focus only on public institutional information.\nNo meta-commentary or conversational filler. Provide the facts immediately."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -6624,
+        336
+      ],
+      "id": "707ca0da-c021-4f6f-adf4-f0a31f5fa0fd",
+      "name": "About_Estin1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use this tool for any educational or study-related requests. It handles course explanations, step-by-step exercise resolutions, code debugging/writing, and mathematical proofs. To get the best result, provide the student's level (1CP, 2CP, or 1CS) and the specific subject or problem details. This tool provides a complete academic response with reasoning and examples, ready to be sent to the student. Do not use this for administrative or schedule queries; only for learning and technical support.answer.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are StudyMate, the Elite Academic Tutor of EstiNova. You are an expert polymath in Computer Science, Mathematics, and Physics, with the teaching skills of a top professor and the coding standards of a Senior Engineer.\n\nTHE EXCELLENCE STANDARD\nYour goal is to provide Gold Standard academic support. Every response must be professional, deep, and pedagogically perfect.\n\nACADEMIC RIGOR\nNever give a result without a formal proof or a logical step-by-step derivation. Use precise terminology. Explain the Why before the How. Deconstruct complex theorems into intuitive mental models using high-level analogies.\n\nPROFESSIONAL CODING STANDARD\nAll code must be production-ready, modular, and following best practices like DRY and SOLID. For Web Development, use modern, professional UI standards. Use clean HTML5, modern CSS3 with Flexbox or Grid, and responsive design. The interface must look like a premium SaaS product with modern typography, optimized spacing, and professional color palettes. For Algorithms, always optimize for time and space complexity. Every function or class must be commented to explain the logic, not just the syntax.\n\nRESPONSE ARCHITECTURE\nStart with an Executive Summary giving a high-level overview. Follow with a Deep Dive containing detailed explanations in logical blocks. Include a Pro-Tip or Edge Cases section to mention common pitfalls or industry-standard tricks. Conclude with a Key Takeaway summarizing the core point in two sentences.\n\nFORMATTING AND CLARITY\nUse bold text for key terms and professional spacing between paragraphs. For code, always specify the language tag. Use clean, readable Markdown tables for comparisons.\n\nLANGUAGE AND TONE\nMaintain a professional, encouraging, and highly intellectual tone. Reply in the exact language used by the student: French, English, or Darija. Calibrate the complexity to be slightly above the student's level (1CP, 2CP, 1CS) to encourage academic growth.\n\nSTRICT RULE\nNo meta-talk. No \"Sure, I can help\" or \"Here is the explanation\". Start directly with the professional academic content."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -6272,
+        336
+      ],
+      "id": "ee36ac9e-4e1f-4141-9f52-077300cbfc9b",
+      "name": "Studies1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "This tool manages academic logistics for ESTIN students by retrieving real-time data from official schedules and curricula. It provides precise information regarding class times, room assignments, module lists, coefficients, and ECTS credits. To function correctly, every request must specify the academic level (1CP, 2CP, or 1CS). While it can scan both sections if unspecified, including the section (A or B) ensures the most accurate results for CP students.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are the timetable and curriculum resolver for EstiNova. You are only called by the main EstiNova agent, never directly by a student.\n\nYou have access to seven data sources. Five of them contain class schedules organized by level and section: schedule_1cp_a covers first year CP section A, schedule_1cp_b covers first year CP section B, schedule_2cp_a covers second year CP section A, schedule_2cp_b covers second year CP section B, and schedule_1cs covers the first year of the superior cycle with no section split. Two sources contain curriculum data: curriculum_1cp holds the subject list, coefficients, and credits for first year CP, and curriculum_2cp holds the same for second year CP.\n\nWhen you receive a request, first decide whether it is about a schedule or a curriculum. A schedule question asks when or where something happens. A curriculum question asks what subjects exist, what their coefficients are, or how credits are distributed.\n\nFor schedule questions, use the data source that matches the stated level and section. If the section is not specified, query both section sources for that level and combine the results. For curriculum questions, use the curriculum source that matches the level. The section does not matter for curriculum queries. For 1CS students, only the schedule source exists, so inform the main agent if a curriculum question comes in for that level.\n\nIf the level is not specified in the request, return the text MISSING LEVEL and stop. Do not guess.\n\nIf a data source is unavailable or returns nothing, return the text DATA UNAVAILABLE followed by the source name. Never invent schedule or curriculum data.\n\nReturn raw structured data only. No explanations, no greetings."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -5920,
+        336
+      ],
+      "id": "bff4312c-6c0d-40d5-b41b-b8f3f830f936",
+      "name": "timetable_resolver1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use this tool to locate students or faculty members within the ESTIN ecosystem. To return a valid response, the tool requires at least one identifier: a Full Name, an Email Address, or a Group Number. It retrieves only public information (group, section, level, or faculty email). You are strictly forbidden from using this tool to access or disclose private data, such as grades, matricule IDs, or personal contact details. If the academic level is unknown, the tool will automatically scan all available preparatory cycles (1CP/2CP).",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are the directory search agent for EstiNova. You are only called by the main EstiNova agent.\n\nYou have access to three data sources. students_1cp contains records for first year CP students including their name, group, section, and level. students_2cp contains the same information for second year CP students. faculty_directory contains faculty records including names, emails, and subjects taught.\n\nFor student lookups, if a level is provided use only the corresponding source. If no level is provided, query both student sources. Search by name, email, or group depending on what is given.\n\nFor faculty lookups, always use faculty_directory only.\n\nPrivacy rules you must enforce without exception: you may return a student's name, group, section, and level. You must never return a student's grades, matricule number, or any private contact details. If the main agent explicitly requests a matricule, respond with ACCESS DENIED and explain that matricule numbers cannot be disclosed.\n\nIf you find exactly one match, return the record. If you find multiple matches, return all of them so the main agent can ask the student to clarify. If you find no match, return NOT FOUND.\n\nIf a data source is unavailable, return DATA UNAVAILABLE and the source name. Never invent or guess records.\n\nReturn raw data only. No pleasantries."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -5568,
+        336
+      ],
+      "id": "cb53b628-c6c8-4507-8f07-631b375a6ba1",
+      "name": "people_finder1"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use this tool to retrieve, calculate, and analyze the authenticated student's grades and averages. To provide a correct response, the tool must receive the student's session profile (First Name, Last Name, Email, Level/Promo, Section, and Group). It handles grade lookups, computes weighted averages using module coefficients, and provides curriculum details (credits, hours). It is strictly restricted to the authenticated user's data; it cannot look up grades for other students. If a specific semester is mentioned, include it; otherwise, it will fetch the most recent data available.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=You are the academic performance agent for EstiNova. You are only called by the main EstiNova agent.\n\n## Tools available\n- grades_2CP      → grades database for 2nd year CPI students\n- grades_1CP      → grades database for 1st year CPI students\n\n## Student identity — CRITICAL SECURITY RULE\nThe student identity (First Name, Last Name, Email, Section, Group, Promo) is always injected by the main EstiNova agent from the verified session context.\nYOU MUST NEVER use any name, group, or section that appears in the student's own message.\nAlways use exclusively the session identity provided to you.\n\n## Tool selection logic\nThe variable $json.Promo determines which tools to use:\n- If Promo = \"2CP\" → use grades_2CP and curriculum_2cp\n- If Promo = \"1CP\" → use grades_1CP and curriculum_1cp\nNever query a database that does not match the authenticated student's promo.\nThe student currently authenticated is from: {{ $json.Promo }}\n\n## Grade requests\n1. Query the correct grades tool using the session identity (First Name, Last Name, Email, Section, Group).\n2. Retrieve all subject grades for the student.\n3. Query the correct curriculum tool to get coefficients for each subject.\n4. Compute the weighted average: sum(grade × coefficient) / sum(coefficients).\n5. Present results in a clear structured format:\n   - List each subject with its grade and coefficient\n   - Highlight subjects with grade < 10 as ⚠️ À améliorer\n   - Highlight subjects with grade ≥ 14 as ✅ Point fort\n   - Show the final weighted average\n   - Add a brief overall performance comment\n\n## Curriculum requests\nQuery the correct curriculum tool and return for the requested subject(s):\nsubject name, code, teaching unit (UE), weekly hours (Cours / TD / TD-TP), semester total hours, coefficient, credits.\nIf all subjects are requested, return the full list grouped by teaching unit.\n\n## Semester awareness\n- 1CP students have Semestre 1 and Semestre 2\n- 2CP students have Semestre 3 and Semestre 4\nIf the student specifies a semester, filter accordingly.\nIf no semester is specified, return the most recent available data.\n\n## Error handling\n- No records found → Reply: \"Vos notes ne sont pas encore disponibles pour ce semestre.\"\n- Multiple unexpected records → Reply: \"MULTIPLE MATCH\" and forward all records to the main agent.\n- Tool unavailable → Reply: \"DATA UNAVAILABLE: [tool name]\" and do not invent any data.\n- Never fabricate grades, averages, or curriculum data under any circumstance.\n\n## Language\nAlways respond in the same language the student used (Arabic, French, or English).\nUse a professional but friendly academic tone."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -5248,
+        336
+      ],
+      "id": "cc3a6a27-5b1f-478d-8e79-b609cb647e2b",
+      "name": "grade_report1"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Sends an HTML email via Gmail. Requires a verified recipient address, a subject line, and a complete HTML message body. Never call this without a confirmed address.",
+        "sendTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('To', ``, 'string') }}",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('BCC', ``, 'string') }}",
+          "ccList": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('CC', ``, 'string') }}",
+          "senderName": "EstiNova",
+          "replyTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Send_Replies_To', ``, 'string') }}",
+          "replyToSenderOnly": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Reply_to_Sender_Only', ``, 'boolean') }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -3760,
+        384
+      ],
+      "id": "a276f218-b677-4cb8-846c-59297963d573",
+      "name": "gmail_send1",
+      "webhookId": "4e748aa5-039b-435e-9126-e0c5057d54e6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "NHN2lYXOIy281OqT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -3472,
+        1056
+      ],
+      "id": "b821697f-5a30-4c2f-afb6-33e56f2bbdf8",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "UNHap0laqH9HvGlk",
+          "name": "Daily"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Authantification",
+        "height": 720,
+        "width": 1712,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -11648,
+        -1264
+      ],
+      "typeVersion": 1,
+      "id": "463de8e7-d5b9-4110-9f2c-618f0b2993a2",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "## File extraction and processing engine",
+        "height": 1424,
+        "width": 2400,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -8816,
+        -2176
+      ],
+      "typeVersion": 1,
+      "id": "28e3ece6-b2b9-4744-a439-8f38d376329f",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-hasfile",
+              "leftValue": "={{ $json['First Name'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -11056,
+        -752
+      ],
+      "id": "b8511a00-e0a9-4638-8833-d981d0d5db3b",
+      "name": "Visiter ?1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════════════\n// SECURITY AUDIT LOGGER — Unauthorized Access Attempt\n// Logs every rejected session to the Activity Log sheet\n// ═══════════════════════════════════════════════════════════════\n\n// Correction : On cible 'Webhook1' (avec le 1) au lieu de 'Webhook'\nconst body = $('Webhook1').first().json.body || {};\n\n// Sécurisation au cas où le noeud 'Get Admin From Sheet' n'existe pas dans le flux\nlet admin = {};\ntry {\n  admin = $('Get Admin From Sheet').first().json || {};\n} catch (e) {\n  admin = { Role: 'NOT_FOUND' };\n}\n\nconst auditEntry = {\n  timestamp: new Date().toISOString(),\n  event: 'UNAUTHORIZED_ACCESS_ATTEMPT',\n  email_attempted: body.email || 'UNKNOWN',\n  role_found: admin.Role || 'NOT_FOUND',\n  session_id: body.sessionId || 'NO_SESSION',\n  ip: body.ip || 'UNKNOWN'\n};\n\nconsole.log('[SECURITY AUDIT]', JSON.stringify(auditEntry));\nreturn [{ json: auditEntry }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10800,
+        -976
+      ],
+      "id": "ad3e290d-3929-4979-b24c-bd4bc2da0506",
+      "name": "Log Unauthorized Attempt"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1RYrtcptRDlmTq8VpccHHiGzxzYqjkaUcUSnh1dU6JDE",
+          "mode": "list",
+          "cachedResultName": "Activity_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RYrtcptRDlmTq8VpccHHiGzxzYqjkaUcUSnh1dU6JDE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1887397320,
+          "mode": "list",
+          "cachedResultName": "Feuille 2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RYrtcptRDlmTq8VpccHHiGzxzYqjkaUcUSnh1dU6JDE/edit#gid=1887397320"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Colonne 1",
+              "displayName": "Colonne 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 2",
+              "displayName": "Colonne 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 3",
+              "displayName": "Colonne 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 4",
+              "displayName": "Colonne 4",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 5",
+              "displayName": "Colonne 5",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 6",
+              "displayName": "Colonne 6",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 7",
+              "displayName": "Colonne 7",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 8",
+              "displayName": "Colonne 8",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 9",
+              "displayName": "Colonne 9",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 10",
+              "displayName": "Colonne 10",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 11",
+              "displayName": "Colonne 11",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 12",
+              "displayName": "Colonne 12",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 13",
+              "displayName": "Colonne 13",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 14",
+              "displayName": "Colonne 14",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 15",
+              "displayName": "Colonne 15",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 16",
+              "displayName": "Colonne 16",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 17",
+              "displayName": "Colonne 17",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 18",
+              "displayName": "Colonne 18",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 19",
+              "displayName": "Colonne 19",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 20",
+              "displayName": "Colonne 20",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 21",
+              "displayName": "Colonne 21",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 22",
+              "displayName": "Colonne 22",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 23",
+              "displayName": "Colonne 23",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 24",
+              "displayName": "Colonne 24",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 25",
+              "displayName": "Colonne 25",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Colonne 26",
+              "displayName": "Colonne 26",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email_attempted",
+              "displayName": "email_attempted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role_found",
+              "displayName": "role_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ip",
+              "displayName": "ip",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -10512,
+        -976
+      ],
+      "id": "da5c0a1c-8094-4756-b6d3-a17a082d6d40",
+      "name": "Write Rejection to Activity Log",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ output: 'Accès refusé. Vous n\\'êtes pas autorisé à utiliser ce service.', audit_logged: true }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -10192,
+        -976
+      ],
+      "id": "7f1cd417-4445-4e1e-a837-00970b1f8bc8",
+      "name": "Reject Non-Admin"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gemini-2.5-flash:free",
+          "mode": "list",
+          "cachedResultName": "gemini-2.5-flash:free"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -5600,
+        1936
+      ],
+      "id": "a43785d1-7576-46f3-a6bd-5a6d818a9275",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "DkrHqSDB6XjOlMQh",
+          "name": "OpenAI account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "grade_report1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "people_finder1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "About_Estin1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Studies1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image (Tesseract OCR)": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract HTML (Code)": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory28": {
+      "ai_memory": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract TXT": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract CSV": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract JSON": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract DOCX (XML parse)": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract XLSX (Code)": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unsupported Type": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Inject Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch File Type": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract TXT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract CSV",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract HTML (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract DOCX (XML parse)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract XLSX (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Image (Tesseract OCR)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 → Binary + Detect Type": {
+      "main": [
+        [
+          {
+            "node": "Switch File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize + Inject Analysis": {
+      "main": [
+        [
+          {
+            "node": "Analyse fichier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory29": {
+      "ai_memory": [
+        [
+          {
+            "node": "grade_report1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory30": {
+      "ai_memory": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory31": {
+      "ai_memory": [
+        [
+          {
+            "node": "About_Estin1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory32": {
+      "ai_memory": [
+        [
+          {
+            "node": "people_finder1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory33": {
+      "ai_memory": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrer": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyse fichier": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory2": {
+      "ai_memory": [
+        [
+          {
+            "node": "Studies1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model21": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "About_Estin1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Studies1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "people_finder1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "grade_report1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete ALL Qdrant (reconstruction)1": {
+      "main": [
+        [
+          {
+            "node": "List All Files in RAG Folder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File (Schedule)1": {
+      "main": [
+        [
+          {
+            "node": "Insert into Qdrant (Schedule)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Loader (Schedule)1": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert into Qdrant (Schedule)1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Splitter (Schedule)1": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Data Loader (Schedule)1",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File (Trigger)1": {
+      "main": [
+        [
+          {
+            "node": "Insert into Qdrant (Trigger)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Loader (Trigger)1": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert into Qdrant (Trigger)1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Splitter (Trigger)1": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Data Loader (Trigger)1",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace (multilingual-e5-large)1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert into Qdrant (Schedule)1",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Insert into Qdrant (Trigger)1",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "knowledge_vault1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Files Array1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Each File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List All Files in RAG Folder1": {
+      "main": [
+        [
+          {
+            "node": "Split Files Array1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger (3h du matin)1": {
+      "main": [
+        [
+          {
+            "node": "Delete ALL Qdrant (reconstruction)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "knowledge_vault1": {
+      "ai_tool": [
+        [
+          {
+            "node": "About_Estin1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "people_finder1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Chunks by file_id1": {
+      "main": [
+        [
+          {
+            "node": "Download File (Trigger)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capturer Nom (Trigger)1": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Chunks by file_id1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capturer Nom du Fichier1": {
+      "main": [
+        [
+          {
+            "node": "Download File (Schedule)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Capturer Nom (Trigger)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Each File1": {
+      "main": [
+        [
+          {
+            "node": "Capturer Nom du Fichier1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Each File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire tout Google Sheets1": {
+      "main": [
+        [
+          {
+            "node": "Écrire Cache JSON (Full)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Upsert Cache JSON (Auto)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Student From Cache1": {
+      "main": [
+        [
+          {
+            "node": "Visiter ?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Get Student From Cache1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has File?1": {
+      "main": [
+        [
+          {
+            "node": "Base64 → Binary + Detect Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Orchestrer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "email_grades composer1": {
+      "ai_tool": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "email_timetable_composer1": {
+      "ai_tool": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple_email_composer1": {
+      "ai_tool": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "email_sender1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory3": {
+      "ai_memory": [
+        [
+          {
+            "node": "email_grades composer1",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "email_timetable_composer1",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Simple_email_composer1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model22": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "announcements1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "curriculum_1cp1": {
+      "ai_tool": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "About_Estin1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "curriculum_2cp1": {
+      "ai_tool": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "About_Estin1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Librery1": {
+      "ai_tool": [
+        [
+          {
+            "node": "About_Estin1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "schedule_1cs1": {
+      "ai_tool": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "schedule_1cp_b1": {
+      "ai_tool": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "schedule_1cp_a1": {
+      "ai_tool": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "schedule_2cp_b1": {
+      "ai_tool": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "schedule_2cp_a1": {
+      "ai_tool": [
+        [
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "faculty_directory1": {
+      "ai_tool": [
+        [
+          {
+            "node": "people_finder1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "students_2cp1": {
+      "ai_tool": [
+        [
+          {
+            "node": "people_finder1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "students_1cp1": {
+      "ai_tool": [
+        [
+          {
+            "node": "people_finder1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "grades_2CP1": {
+      "ai_tool": [
+        [
+          {
+            "node": "grade_report1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "grades_1CP1": {
+      "ai_tool": [
+        [
+          {
+            "node": "grade_report1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "student_contacts_2cp_and_1cp1": {
+      "ai_tool": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "faculty_contacts1": {
+      "ai_tool": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "About_Estin1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Studies1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "timetable_resolver1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "people_finder1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "grade_report1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrer",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gmail_send1": {
+      "ai_tool": [
+        [
+          {
+            "node": "email_sender1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "email_grades composer1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "email_timetable_composer1",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Simple_email_composer1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Visiter ?1": {
+      "main": [
+        [
+          {
+            "node": "Log Unauthorized Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has File?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Unauthorized Attempt": {
+      "main": [
+        [
+          {
+            "node": "Write Rejection to Activity Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Rejection to Activity Log": {
+      "main": [
+        [
+          {
+            "node": "Reject Non-Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "grade_report1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "people_finder1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "timetable_resolver1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "Studies1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "About_Estin1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "Orchestrer",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "Analyse fichier",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "email_timetable_composer1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "Simple_email_composer1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "email_grades composer1",
+            "type": "ai_languageModel",
+            "index": 1
+          },
+          {
+            "node": "email_sender1",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "9BkDzeKcKCb9It6r",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "fa4358f7-e37e-43eb-9305-f248b334a212",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a565d32066fc6ff60bb9a052fb60650bfbadea30d0e115b39e491027787d2dad"
+  },
+  "id": "R9tW106XmckVuNdz",
+  "tags": []
+}

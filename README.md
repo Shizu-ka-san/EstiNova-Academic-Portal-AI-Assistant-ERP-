@@ -1,239 +1,148 @@
-<<<<<<< HEAD
-# 🚀 EstiNova — Intelligent Centralized Assistant (AI ERP)
+# 🚀 EstiNova — Portail Académique & Assistant IA (ERP)
 
-> Projet Pluridisciplinaire · ESTIN 2025/2026  
-> ⚠️ Status: In Development
-
----
-
-## 🧠 Overview
-
-EstiNova is an AI-powered ERP system designed for ESTIN to centralize all academic and administrative information into a single intelligent assistant.
-
-Instead of navigating PDFs, emails, or WhatsApp groups, users can simply ask questions in natural language and receive instant, contextual, and personalized answers.
-
-The system uses a multi-agent architecture combined with a RAG (Retrieval-Augmented Generation) pipeline to provide accurate and secure responses.
+> **Projet Pluridisciplinaire · ESTIN (Amizour, Béjaïa, Algérie) 2025/2026**  
+> ⚠️ **Statut : En cours de développement (Prototype)**
 
 ---
 
-## 🎯 Problem
+## 🧠 Présentation Générale
 
-ESTIN currently faces:
+**EstiNova** est une plateforme moderne pour la gestion académique de l'ESTIN Béjaïa. Elle centralise les emplois du temps, les résultats des examens et les documents administratifs sous une interface fluide et unifiée, pilotée par un assistant IA intelligent.
 
-- Information fragmentation (PDFs, emails, drive, WhatsApp…)
-- Slow access to information
-- No personalization by user role
+Au lieu de naviguer entre plusieurs fichiers PDF, emails ou groupes de communication, les étudiants et enseignants peuvent simplement interagir en langage naturel pour obtenir des informations personnalisées et sécurisées selon leur rôle.
 
 ---
 
-## 💡 Solution
+## 🏗️ Architecture Globale & Flux de Communication
 
-EstiNova provides:
+Le système repose sur une architecture modulaire découplée, où le **Frontend** joue le rôle de coordinateur entre l'orchestrateur IA (**n8n**) et les services d'authentification/stockage (**Supabase**).
 
-- Centralized AI interface (ERP-style)
-- Context-aware responses (student / teacher / admin)
-- Fast access to verified information
-- Secure, role-based data access
-- 24/7 availability
+### Diagramme d'Architecture
 
----
+```mermaid
+graph TD
+    %% Frontend & Clients
+    subgraph Client [Interface Client]
+        FE[Frontend - HTML/CSS/JS]
+    end
 
-## 👥 Target Users
+    %% API Proxy & Backend
+    subgraph Vercel [Hébergement & Proxy Vercel]
+        PX[API Proxy - api/proxy-webhook.js]
+    end
 
-### 🎓 Students
-- Timetable & modules
-- Grades & averages
-- Academic rules & documents
-- Pedagogical help (code, math, writing)
+    %% Supabase
+    subgraph Supa [Base de données & Auth]
+        SB[Supabase Auth & Storage]
+    end
 
-### 👨‍🏫 Professors
-- Manage courses & groups
-- Communicate with students
-- Declare absences
-- Access teaching resources
+    %% n8n
+    subgraph n8n_Engine [Orchestration IA]
+        N8N[Workflow n8n]
+        Orch[Agent Orchestrateur]
+        T_Agent[Agent Emploi du Temps]
+        G_Agent[Agent Notes/Grades]
+        D_Agent[Agent RAG - Documentation]
+    end
 
-### 🏢 Administration
-- Manage academic data
-- Publish announcements
-- Monitor system activity
-- Generate reports
+    %% Google Workspace & Services
+    subgraph Services [Sources de données / API]
+        GS[Google Sheets]
+        GD[Google Drive]
+        GM[Gmail API]
+    end
 
----
+    %% Flux
+    FE -->|1. Auth / Profil / Avatars| SB
+    FE -->|2. Requêtes IA (POST /api/proxy-webhook)| PX
+    PX -->|3. Forward Payload sécurisé| N8N
+    N8N -->|4. Orchestration| Orch
+    Orch --> T_Agent
+    Orch --> G_Agent
+    Orch --> D_Agent
+    T_Agent & G_Agent & D_Agent -->|5. Données / Outils| Services
+```
 
-## 🏗️ Architecture
+### 🔗 Fonctionnement des Connexions
 
-### 🔁 System Flow
-
-1. User sends a message via chatbot  
-2. Frontend sends request via webhook  
-3. User context is retrieved (role, group, etc.)  
-4. Main AI Agent routes request  
-5. Specialized agent processes it  
-6. Response is generated and returned  
-
----
-
-### 🤖 Multi-Agent System
-
-- Main Orchestrator Agent
-- Timetable Agent
-- Grades Agent
-- Documentation Agent (RAG)
-- Email Agent
-- Communication Agent
-- Pedagogical Assistant
-
----
-
-### 📚 RAG Pipeline
-
-- Document ingestion (PDFs)
-- Chunking & embedding
-- Vector search
-- Context-aware answer generation
+1. **Frontend ↔ Proxy API** : Le Frontend communique avec l'API Serverless déployée sur Vercel (`api/proxy-webhook.js`) pour toutes les requêtes de chat. Cela protège les adresses réelles des serveurs n8n contre les attaques directes et ajoute une couche de protection contre le SSRF (Server-Side Request Forgery).
+2. **Proxy API ↔ Webhooks n8n** : Le Proxy transmet de manière sécurisée les payloads d'interaction utilisateur aux Webhooks n8n correspondants (`WEBHOOK_STUDENT`, `WEBHOOK_PROFESSOR`, `WEBHOOK_ADMIN`) en fonction du rôle authentifié de l'utilisateur.
+3. **Le rôle de n8n (Le Cerveau IA)** : 
+   - n8n héberge l'orchestrateur d'agents IA et les sous-agents spécialisés (résolution d'emplois du temps, recherche documentaire RAG, etc.).
+   - Il se connecte de manière autonome aux bases de données administratives (Google Sheets, Google Drive, Gmail API) pour récupérer et mettre à jour les données métiers en temps réel.
+4. **Le rôle de Supabase (Gestion Utilisateur & Profils)** : 
+   - Supabase est utilisé de manière autonome pour authentifier les sessions utilisateurs (adresse `@estin.dz`) et stocker les métadonnées de profil ainsi que les avatars.
+5. **Indépendance Supabase & n8n** : 
+   * **Important** : Supabase et n8n ne sont **pas connectés directement**. 
+   * C'est le **Frontend** qui fait le lien : il valide la session utilisateur auprès de Supabase, puis injecte le contexte de session sécurisé (Prénom, Nom, Rôle, Promotion, Section, Groupe) dans le payload envoyé au Proxy API pour n8n. Cela garantit un cloisonnement fort des responsabilités et une sécurité maximale.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Stack Technique
 
-| Component | Technology |
-|----------|-----------|
-| AI Orchestration | n8n (self-hosted) |
-| LLM | Stepfun 3.5 Flash / Gemini 2.0 |
-| Embeddings | HuggingFace API |
-| Vector Store | In-memory (n8n) |
-| Database | Google Sheets |
-| Email | Gmail API |
-| Frontend | HTML, CSS, JavaScript |
-| Auth | Silent Authentication |
-| Deployment | n8n Cloud / Self-hosted |
-
----
-
-## 🔐 Security
-
-- Role-based access control (RBAC)
-- Protection against prompt injection
-- No access to unauthorized data
-- HTTPS encryption
-- Anti-social engineering design
+| Composant | Technologie | Rôle / Description |
+| :--- | :--- | :--- |
+| **Frontend** | HTML, Vanilla CSS, Vite, TypeScript | Interface utilisateur moderne, réactive et animée |
+| **Authentification** | Supabase Auth (Silent Auth) | Restriction d'accès aux emails `@estin.dz` |
+| **Stockage** | Supabase Storage (avatars) | Hébergement sécurisé des photos de profil |
+| **API Proxy** | Vercel Serverless Function (Node.js) | Proxy sécurisé avec protection SSRF intégrée |
+| **Orchestration IA** | n8n (Self-hosted / Cloud) | Moteur d'agents, workflows et routage intelligent |
+| **Modèles LLM** | Stepfun 3.5 Flash / Gemini 2.0 | Génération de réponses et raisonnement d'agents |
+| **RAG (Documentation)** | HuggingFace API + Vector Store (n8n) | Recherche sémantique dans les règlements intérieurs |
+| **Bases de données Métier** | Google Sheets / SQL Supabase | Stockage des notes, des plannings et des structures |
 
 ---
 
-## ⚙️ Features
-
-### Student Features
-- View timetable
-- Check grades & averages
-- Ask about regulations
-- Get academic help
-- Send emails automatically
-
-### Professor Features
-- Manage groups & schedules
-- Communicate with students
-- Declare absences
-
-### Admin Features
-- Update academic data
-- Manage documents
-- Monitor system usage
-- Publish announcements
-
----
-
-## 📈 Performance
-
-- Simple queries: ~15s  
-- Complex queries: up to 90s  
-
-(*Due to free-tier infrastructure limitations*)
-
----
-
-## ⚠️ Limitations
-
-- No real ESTIN data (simulation only)
-- Free tools only (budget constraints)
-- No dedicated servers
-- No full cybersecurity audit
-- Limited development time (8 weeks)
-
----
-
-## 🚀 Roadmap
-
-### Short Term
-- Add more student levels (2CS, 3CS…)
-- Persistent vector database
-- Real data integration
-
-### Mid Term
-- Notifications system
-- Admin dashboard
-- Multimodal support (images)
-
-### Long Term
-- Mobile app (iOS / Android)
-- Dedicated servers + local LLM
-- Predictive analytics (student performance)
-
----
-
-## 👨‍💻 Team
-
-- Boudjaoui Badis — Project Manager & AI Engineer  
-- Chiheb Israa — AI Engineer (Prompt & RAG)  
-- Gougam Wiam — Frontend Developer  
-- Mansouri Anias — Backend Developer  
-- Hamadouche Axcel — Data Analyst  
-- Naceri Walid — Data Analyst  
-
----
-
-## 📊 Success Metrics
-
-- 100% use cases covered  
-- 0 data leaks in tests  
-- UI rating ≥ 4/5  
-- ≥ 85% correct responses  
-
----
-
-## 📌 Status
-
-🚧 Currently in development (Prototype stage)  
-🎯 Designed to scale into a production-ready ERP AI system
-=======
-# EstiNova - Portail Académique
-
-EstiNova est une application moderne et réactive pour la gestion académique de l'ESTIN Béjaïa. Elle centralise les emplois du temps, les résultats des examens et les documents administratifs sous une interface fluide et unifiée.
-
-## Installation et Développement
+## ⚙️ Installation & Démarrage en local
 
 ### Prérequis
-- Node.js (version 18+)
-- Compte Supabase (optionnel, pour l'authentification des utilisateurs)
+- **Node.js** (version 18 ou supérieure)
+- **npm** (inclus avec Node.js)
+- Une instance **n8n** (locale ou cloud) avec les workflows importés.
+- Un projet **Supabase** configuré.
 
-### Procédure de lancement local
+### Lancement étape par étape
 
-1. Installez les dépendances du projet :
+1. **Cloner le projet** et se placer à la racine :
+   ```bash
+   git clone <url-du-depot>
+   cd EstiNova
+   ```
+
+2. **Configurer l'application web** :
+   Allez dans le dossier `Web App` :
+   ```bash
+   cd "Web App"
+   ```
+   Créez un fichier `.env.local` en vous basant sur `.env.example` et complétez les variables :
+   ```env
+   VITE_SUPABASE_URL=https://votre-projet.supabase.co
+   VITE_SUPABASE_ANON_KEY=votre-cle-anon-supabase
+   ```
+
+3. **Installer les dépendances et démarrer** :
    ```bash
    npm install
-   ```
-
-2. Créez un fichier `.env.local` à la racine (en vous basant sur `.env.example`) et renseignez vos variables d'accès Supabase si nécessaire.
-
-3. Lancez le serveur de développement :
-   ```bash
+   # Lancer en mode développement
    npm run dev
    ```
+   L'application sera disponible sur [http://localhost:3000](http://localhost:3000).
 
-Le portail sera disponible à l'adresse [http://localhost:3000](http://localhost:3000).
+---
 
-## Déploiement
+## 🔐 Sécurité & Bonnes Pratiques
 
-Ce projet est configuré pour être déployé directement sur **Vercel** :
-- Les en-têtes de sécurité (CSP, HSTS, protection Clickjacking) sont configurés dans le fichier [vercel.json](./vercel.json).
-- Le proxy d'API sécurisé est déployé automatiquement via la fonction serverless dans [api/proxy-webhook.js](./api/proxy-webhook.js).
->>>>>>> 9dd2532 (Update)
+- **Contrôle d'accès basé sur les rôles (RBAC)** : Les requêtes n8n injectent dynamiquement le profil utilisateur authentifié par Supabase. Un étudiant ne peut pas appeler les outils d'un professeur.
+- **SSRF Blocklist** : L'API proxy bloque toutes les requêtes vers des adresses IP locales (`127.0.0.1`, `localhost`, plages d'IP privées) pour interdire le scan de ports internes.
+- **Zéro Secret Commité** : Tous les secrets de production et clés d'API privées sont configurés sur les environnements de déploiement (Vercel, variables d'environnement de n8n) et exclus de Git via `.gitignore`.
+
+---
+
+## 👨‍💻 Équipe Projet
+
+- **Boudjaoui Badis** — Chef de Projet & Ingénieur IA  
+- **Chiheb Israa** — Ingénieur IA (Prompting & RAG)  
+- **Gougam Wiam** — Développeur Frontend  
+- **Mansouri Anias** — Développeur Backend  
+- **Hamadouche Axcel** — Analyste de Données  
+- **Naceri Walid** — Analyste de Données  

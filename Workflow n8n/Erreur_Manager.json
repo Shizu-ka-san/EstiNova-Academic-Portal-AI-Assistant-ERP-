@@ -1,0 +1,393 @@
+{
+  "name": "Erreur_Manager",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "91a5c103-27e3-4cb5-ac67-01ea5cdaa2b6",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1360,
+        0
+      ],
+      "notes": "Se déclenche automatiquement quand n'importe quel workflow échoue."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-001",
+              "name": "timestamp",
+              "value": "={{ $now.toFormat('dd/MM/yyyy HH:mm:ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "field-002",
+              "name": "workflow_id",
+              "value": "={{ $json.workflow.id }}",
+              "type": "string"
+            },
+            {
+              "id": "field-003",
+              "name": "workflow_name",
+              "value": "={{ $json.workflow.name }}",
+              "type": "string"
+            },
+            {
+              "id": "field-004",
+              "name": "execution_id",
+              "value": "={{ $json.execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "field-005",
+              "name": "execution_mode",
+              "value": "={{ $json.execution.mode }}",
+              "type": "string"
+            },
+            {
+              "id": "field-006",
+              "name": "error_message",
+              "value": "={{ $json.execution.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "field-007",
+              "name": "error_node",
+              "value": "={{ $json.execution.lastNodeExecuted }}",
+              "type": "string"
+            },
+            {
+              "id": "field-008",
+              "name": "error_stack",
+              "value": "={{ $json.execution.error.stack ? $json.execution.error.stack.slice(0, 500) : 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-009",
+              "name": "retry_url",
+              "value": "={{ 'https://app.n8n.io/workflow/' + $json.workflow.id + '/executions/' + $json.execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "field-010",
+              "name": "status",
+              "value": "❌ ERREUR",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d689c499-647f-4a71-bd4e-a486b7de1fc8",
+      "name": "Formater les données d'erreur",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1_HO5qMbfwzUJCd-tgZF0bUUXpnXqeRzmKPMkcojaXPA",
+          "mode": "list",
+          "cachedResultName": "Erreurs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1_HO5qMbfwzUJCd-tgZF0bUUXpnXqeRzmKPMkcojaXPA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1_HO5qMbfwzUJCd-tgZF0bUUXpnXqeRzmKPMkcojaXPA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Time": "={{ $json.timestamp }}",
+            "Workflow_id": "={{ $json.workflow_id }}",
+            "Workflow_name": "={{ $json.workflow_name }}",
+            "Execution_id": "={{ $json.execution_id }}",
+            "Execution_mode": "={{ $json.execution_mode }}",
+            "Error_message": "={{ $json.error_message }}",
+            "Retry_url": "={{ $json.retry_url }}",
+            "Error_node": "={{ $json.error_node }}",
+            "Error_stack": "={{ $json.error_stack }}",
+            "Status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Workflow_id",
+              "displayName": "Workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Workflow_name",
+              "displayName": "Workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Execution_id",
+              "displayName": "Execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Execution_mode",
+              "displayName": "Execution_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Error_message",
+              "displayName": "Error_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Error_node",
+              "displayName": "Error_node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Error_stack",
+              "displayName": "Error_stack",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Retry_url",
+              "displayName": "Retry_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "6224bfe7-d117-4863-81b2-231bf7cfc830",
+      "name": "Enregistrer dans Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -880,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2Ihte0EaPOBCxmc2",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-001",
+              "leftValue": "={{ $('Formater les données d\\'erreur').item.json.error_message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3079dba9-01b8-4de1-9194-b6209ad3c3d5",
+      "name": "Erreur valide ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -640,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "dailyhaha31@gmail.com",
+        "subject": "=🚨 Erreur Workflow n8n : {{ $json.Workflow_name }}",
+        "message": "=<html>\n<body style=\"font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px;\">\n  <div style=\"background: white; border-radius: 8px; padding: 24px; max-width: 600px; margin: auto; border-left: 5px solid #e53e3e;\">\n    <h2 style=\"color: #e53e3e;\">🚨 Erreur dans un Workflow n8n</h2>\n    <table style=\"width:100%; border-collapse: collapse;\">\n      <tr><td style=\"padding:8px; font-weight:bold; color:#555;\">Workflow</td><td style=\"padding:8px;\">{{ $json.Workflow_name }}</td></tr>\n      <tr style=\"background:#f9f9f9;\"><td style=\"padding:8px; font-weight:bold; color:#555;\">Horodatage</td><td style=\"padding:8px;\">{{ $json.Time }}</td></tr>\n      <tr><td style=\"padding:8px; font-weight:bold; color:#555;\">Nœud en erreur</td><td style=\"padding:8px; color:#e53e3e;\">{{ $json.Error_node }}</td></tr>\n      <tr style=\"background:#f9f9f9;\"><td style=\"padding:8px; font-weight:bold; color:#555;\">Message</td><td style=\"padding:8px;\">{{ $json.Error_message }}</td></tr>\n    </table>\n    <p style=\"margin-top:20px;\">\n      <a href=\"{{ $json.Retry_url }}\" style=\"background:#3182ce; color:white; padding:10px 20px; border-radius:5px; text-decoration:none;\">🔍 Voir l'exécution</a>\n    </p>\n    <p style=\"color:#999; font-size:12px; margin-top:20px;\">Cet email a été généré automatiquement par l'agent Error Logger de n8n.</p>\n  </div>\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "1851bb30-b6a2-4958-935a-a7bb930eda5c",
+      "name": "Envoyer Email d'alerte",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -400,
+        -112
+      ],
+      "webhookId": "fc94b812-a2dc-447d-9f81-80b6ec3366c4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "NHN2lYXOIy281OqT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-skip-001",
+              "name": "skipped_reason",
+              "value": "Aucun message d'erreur détecté — log ignoré.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d94d7dfb-bbd3-49bc-ae3b-28ab411d3da7",
+      "name": "Ignorer (pas d'erreur)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Formater les données d'erreur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formater les données d'erreur": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer dans Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer dans Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Erreur valide ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erreur valide ?": {
+      "main": [
+        [
+          {
+            "node": "Envoyer Email d'alerte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignorer (pas d'erreur)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "995e30b7-7f3b-4cb7-b7e3-ba6b2725374e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a565d32066fc6ff60bb9a052fb60650bfbadea30d0e115b39e491027787d2dad"
+  },
+  "id": "9BkDzeKcKCb9It6r",
+  "tags": []
+}

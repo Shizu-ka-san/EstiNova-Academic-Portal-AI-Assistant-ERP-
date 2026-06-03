@@ -1,0 +1,17 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+build/
+dist/
+.next/
+.vercel/
+server.js
+
+# Env files
+.env*
+!.env.example
+
+# Temporary / OS files
+.DS_Store
+*.log
