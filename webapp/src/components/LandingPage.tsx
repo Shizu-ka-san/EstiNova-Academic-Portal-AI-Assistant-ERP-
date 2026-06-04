@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Sparkles, Menu, ArrowRight, Bot, Send, Calendar, GraduationCap, 
-  FileText, Users, Mail, BookOpen, Shield, Globe, Zap, Briefcase, 
-  Settings, Check, AlertTriangle, BarChart3, Database, Github, 
-  Linkedin, Palette, Server, X, Activity, Cpu, ChevronRight
+import {
+  Sparkles, Menu, ArrowRight, Bot, Send, Calendar, GraduationCap,
+  FileText, Users, Mail, BookOpen, Shield, Globe, Zap, Briefcase,
+  Settings, Check, AlertTriangle, BarChart3, Database, Github,
+  Linkedin, Server, X, Activity, Cpu, ChevronRight
 } from 'lucide-react';
 import Logo from './Logo';
 import Aurora from './Aurora';
@@ -73,7 +73,7 @@ const USER_TABS_DATA = {
 export default function LandingPage({ onStartAuth }: LandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'student' | 'professor' | 'admin'>('student');
-  
+
   // Demo Chatbot State
   const [demoMessages, setDemoMessages] = useState<DemoMessage[]>([
     {
@@ -135,11 +135,11 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
 
   return (
     <div className="min-h-screen bg-[#0d0f1c] text-[#f9fafb] selection:bg-indigo-500/30 overflow-x-hidden relative flex flex-col font-sans">
-      
+
       {/* Decorative Orbs */}
       <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-500/5 blur-[120px] pointer-events-none" />
-      
+
       {/* 1. Header Navigation */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-indigo-950 bg-[#0d0f1cc0] backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -150,32 +150,32 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
 
           {/* Desktop Navigation links */}
           <nav className="hidden items-center gap-8 md:flex">
-            <a 
-              href="#features" 
+            <a
+              href="#features"
               onClick={(e) => handleScrollToSection(e, 'features')}
               className="relative text-sm text-gray-400 transition-colors hover:text-white group py-1"
             >
               Fonctionnalités
               <span className="absolute -bottom-0.5 left-0 h-0.5 w-0 bg-indigo-400 transition-all group-hover:w-full"></span>
             </a>
-            <a 
-              href="#users" 
+            <a
+              href="#users"
               onClick={(e) => handleScrollToSection(e, 'users')}
               className="relative text-sm text-gray-400 transition-colors hover:text-white group py-1"
             >
               Utilisateurs
               <span className="absolute -bottom-0.5 left-0 h-0.5 w-0 bg-indigo-400 transition-all group-hover:w-full"></span>
             </a>
-            <a 
-              href="#architecture" 
+            <a
+              href="#architecture"
               onClick={(e) => handleScrollToSection(e, 'architecture')}
               className="relative text-sm text-gray-400 transition-colors hover:text-white group py-1"
             >
               Architecture
               <span className="absolute -bottom-0.5 left-0 h-0.5 w-0 bg-indigo-400 transition-all group-hover:w-full"></span>
             </a>
-            <a 
-              href="#about" 
+            <a
+              href="#about"
               onClick={(e) => handleScrollToSection(e, 'about')}
               className="relative text-sm text-gray-400 transition-colors hover:text-white group py-1"
             >
@@ -185,8 +185,8 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">
-            <button 
-              onClick={onStartAuth} 
+            <button
+              onClick={onStartAuth}
               className="group flex items-center gap-0 hover:gap-2 px-3.5 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-indigo-950/40 transition-all duration-300 ease-in-out cursor-pointer"
             >
               <Users className="h-4.5 w-4.5 shrink-0" />
@@ -194,8 +194,8 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
                 Se Connecter
               </span>
             </button>
-            <button 
-              onClick={onStartAuth} 
+            <button
+              onClick={onStartAuth}
               className="group flex items-center gap-0 hover:gap-2 bg-indigo-500 text-[#0d0f1c] hover:bg-indigo-400 px-3.5 py-2.5 rounded-xl hover:scale-105 active:scale-95 transition-all duration-300 ease-in-out shadow-lg shadow-indigo-500/20 cursor-pointer"
             >
               <Sparkles className="h-4.5 w-4.5 shrink-0" />
@@ -206,8 +206,8 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
           </div>
 
           {/* Mobile Menu Trigger Button */}
-          <button 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-indigo-950/60"
             aria-label="Toggle menu"
           >
@@ -219,43 +219,43 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
         {mobileMenuOpen && (
           <div className="border-t border-indigo-950 bg-[#0d0f1c] md:hidden">
             <nav className="flex flex-col px-4 py-4 space-y-3">
-              <a 
-                href="#features" 
-                onClick={(e) => { handleScrollToSection(e, 'features'); setMobileMenuOpen(false); }} 
+              <a
+                href="#features"
+                onClick={(e) => { handleScrollToSection(e, 'features'); setMobileMenuOpen(false); }}
                 className="block py-2 text-sm text-gray-400 hover:text-white"
               >
                 Fonctionnalités
               </a>
-              <a 
-                href="#users" 
-                onClick={(e) => { handleScrollToSection(e, 'users'); setMobileMenuOpen(false); }} 
+              <a
+                href="#users"
+                onClick={(e) => { handleScrollToSection(e, 'users'); setMobileMenuOpen(false); }}
                 className="block py-2 text-sm text-gray-400 hover:text-white"
               >
                 Utilisateurs
               </a>
-              <a 
-                href="#architecture" 
-                onClick={(e) => { handleScrollToSection(e, 'architecture'); setMobileMenuOpen(false); }} 
+              <a
+                href="#architecture"
+                onClick={(e) => { handleScrollToSection(e, 'architecture'); setMobileMenuOpen(false); }}
                 className="block py-2 text-sm text-gray-400 hover:text-white"
               >
                 Architecture
               </a>
-              <a 
-                href="#about" 
-                onClick={(e) => { handleScrollToSection(e, 'about'); setMobileMenuOpen(false); }} 
+              <a
+                href="#about"
+                onClick={(e) => { handleScrollToSection(e, 'about'); setMobileMenuOpen(false); }}
                 className="block py-2 text-sm text-gray-400 hover:text-white"
               >
                 À Propos
               </a>
               <div className="h-px bg-indigo-950 my-2"></div>
-              <button 
-                onClick={() => { onStartAuth(); setMobileMenuOpen(false); }} 
+              <button
+                onClick={() => { onStartAuth(); setMobileMenuOpen(false); }}
                 className="w-full text-left py-2 text-sm text-gray-400 hover:text-white font-medium"
               >
                 Se Connecter
               </button>
-              <button 
-                onClick={() => { onStartAuth(); setMobileMenuOpen(false); }} 
+              <button
+                onClick={() => { onStartAuth(); setMobileMenuOpen(false); }}
                 className="w-full bg-indigo-500 text-[#0d0f1c] text-center py-2.5 rounded-xl hover:bg-indigo-400 font-bold transition-colors"
               >
                 Commencer
@@ -269,16 +269,16 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
       <section className="relative min-h-screen pt-24 sm:pt-32 flex items-center shrink-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent pointer-events-none z-10"></div>
         <Aurora colorStops={['#1e1b4b', '#4f46e5', '#312e81']} />
-        
+
         {/* Ambient floating elements */}
         <div className="absolute -left-32 top-1/4 h-[400px] w-[400px] rounded-full bg-indigo-500/5 blur-3xl pointer-events-none animate-pulse"></div>
         <div className="absolute -right-32 bottom-1/4 h-[300px] w-[300px] rounded-full bg-violet-500/5 blur-3xl pointer-events-none animate-pulse"></div>
-        
+
         <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 w-full z-10">
           <div className="grid gap-12 lg:grid-cols-12 lg:gap-8 items-center">
-            
+
             {/* Left Column Content */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
@@ -291,26 +291,26 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
                 </span>
                 Système ERP Académique pour l'ESTIN
               </div>
-              
+
               <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl leading-[1.15]">
                 Le Portail Académique <span className="text-indigo-400 bg-gradient-to-r from-indigo-400 via-purple-300 to-fuchsia-400 bg-clip-text text-transparent">Centralisé</span>
               </h1>
-              
+
               <p className="mt-6 text-base sm:text-lg leading-relaxed text-gray-400 max-w-2xl mx-auto lg:mx-0 font-medium">
-                Accédez instantanément à vos emplois du temps, notes, documents officiels et plus encore. 
+                Accédez instantanément à vos emplois du temps, notes, documents officiels et plus encore.
                 Une interface conversationnelle unique adaptée à votre profil d'étudiant ou de professeur.
               </p>
-              
+
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
-                <button 
-                  onClick={onStartAuth} 
+                <button
+                  onClick={onStartAuth}
                   className="bg-indigo-500 text-[#0d0f1c] hover:bg-indigo-400 px-6 py-3.5 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   Commencer Maintenant
                   <ArrowRight className="h-5 w-5" />
                 </button>
-                <a 
-                  href="#features" 
+                <a
+                  href="#features"
                   className="border border-indigo-950/60 bg-[#131526] text-white hover:bg-indigo-950/30 px-6 py-3.5 rounded-xl font-bold transition-colors text-center"
                 >
                   En Savoir Plus
@@ -335,7 +335,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
             </motion.div>
 
             {/* Right Column Content - Fully Interactive Mock-up Chat */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -343,7 +343,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
             >
               <div className="relative rounded-2xl border border-indigo-950 bg-[#16192a]/95 p-1 shadow-2xl overflow-hidden backdrop-blur-md">
                 <div className="rounded-xl bg-[#0d0f1c]/80 overflow-hidden">
-                  
+
                   {/* Chat Head Header */}
                   <div className="flex items-center gap-3 border-b border-indigo-950 px-4 py-3 bg-[#111322]">
                     <div className="flex h-10 w-10 items-center justify-center shrink-0">
@@ -361,22 +361,21 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
                   {/* Chat Messages list */}
                   <div className="h-[280px] overflow-y-auto p-4 space-y-4 text-xs scrollbar-none flex flex-col">
                     {demoMessages.map((msg) => (
-                      <div 
-                        key={msg.id} 
+                      <div
+                        key={msg.id}
                         className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div 
-                          className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-md font-medium leading-relaxed ${
-                            msg.sender === 'user' 
-                              ? 'bg-indigo-500 text-[#0d0f1c] rounded-tr-none' 
+                        <div
+                          className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-md font-medium leading-relaxed ${msg.sender === 'user'
+                              ? 'bg-indigo-500 text-[#0d0f1c] rounded-tr-none'
                               : 'bg-[#1e2238] text-gray-100 border border-indigo-950/40 rounded-tl-none'
-                          }`}
+                            }`}
                         >
                           {msg.text}
                         </div>
                       </div>
                     ))}
-                    
+
                     {/* Simulated typing dot effect */}
                     {isDemoTyping && (
                       <div className="flex justify-start">
@@ -391,19 +390,19 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
 
                   {/* Small preset suggestions tags to help the user click */}
                   <div className="px-4 pb-2 pt-1 flex flex-wrap gap-1.5 bg-[#0d0f1c]/40 border-t border-[#1e2238]">
-                    <button 
+                    <button
                       onClick={() => setDemoInput("Mon emploi du temps")}
                       className="text-[10px] bg-[#161a2f] text-indigo-300 hover:bg-[#1e2238] px-2 py-1 rounded-md border border-[#1e2238] font-medium transition-all"
                     >
                       📅 Planning
                     </button>
-                    <button 
+                    <button
                       onClick={() => setDemoInput("Mes notes")}
                       className="text-[10px] bg-[#161a2f] text-[#a78bfa] hover:bg-[#1e2238] px-2 py-1 rounded-md border border-[#1e2238] font-medium transition-all"
                     >
                       🎓 Notes
                     </button>
-                    <button 
+                    <button
                       onClick={() => setDemoInput("absence")}
                       className="text-[10px] bg-[#161a2f] text-emerald-400 hover:bg-[#1e2238] px-2 py-1 rounded-md border border-[#1e2238] font-medium transition-all"
                     >
@@ -421,8 +420,8 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
                         placeholder="Posez votre question de démo..."
                         className="flex-1 rounded-xl border border-indigo-950 bg-[#0d0f1c] px-4 py-2.5 text-xs text-[#f9fafb] placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
-                      <button 
-                        type="submit" 
+                      <button
+                        type="submit"
                         className="h-9 w-9 shrink-0 flex items-center justify-center rounded-xl bg-indigo-500 text-[#0d0f1c] hover:bg-indigo-400 transition-all active:scale-95 cursor-pointer"
                       >
                         <Send className="h-4 w-4" />
@@ -432,7 +431,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
 
                 </div>
               </div>
-              
+
               {/* Decorative back framing shadow */}
               <div className="absolute -bottom-4 -left-4 -z-10 h-full w-full rounded-2xl border border-indigo-500/10 pointer-events-none"></div>
             </motion.div>
@@ -454,9 +453,9 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
 
           {/* Grid setup */}
           <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            
+
             {/* Card 1 */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -474,7 +473,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
             </motion.div>
 
             {/* Card 2 */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -492,7 +491,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
             </motion.div>
 
             {/* Card 3 */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -510,7 +509,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
             </motion.div>
 
             {/* Card 4 */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -528,7 +527,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
             </motion.div>
 
             {/* Card 5 */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -546,7 +545,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
             </motion.div>
 
             {/* Card 6 */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -615,37 +614,34 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
           {/* User Type Tabs Switcher */}
           <div className="mt-12 flex justify-center">
             <div className="inline-flex rounded-xl border border-indigo-950 bg-[#111322] p-1">
-              <button 
-                onClick={() => setActiveTab('student')} 
-                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
-                  activeTab === 'student' 
-                    ? 'bg-indigo-500 text-[#0d0f1c] shadow' 
+              <button
+                onClick={() => setActiveTab('student')}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${activeTab === 'student'
+                    ? 'bg-indigo-500 text-[#0d0f1c] shadow'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <GraduationCap className="h-4 w-4" />
                 <span>Étudiants</span>
               </button>
-              
-              <button 
-                onClick={() => setActiveTab('professor')} 
-                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
-                  activeTab === 'professor' 
-                    ? 'bg-indigo-500 text-[#0d0f1c] shadow' 
+
+              <button
+                onClick={() => setActiveTab('professor')}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${activeTab === 'professor'
+                    ? 'bg-indigo-500 text-[#0d0f1c] shadow'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <Briefcase className="h-4 w-4" />
                 <span>Professeurs</span>
               </button>
 
-              <button 
-                onClick={() => setActiveTab('admin')} 
-                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
-                  activeTab === 'admin' 
-                    ? 'bg-indigo-500 text-[#0d0f1c] shadow' 
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${activeTab === 'admin'
+                    ? 'bg-indigo-500 text-[#0d0f1c] shadow'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <Settings className="h-4 w-4" />
                 <span>Administration</span>
@@ -656,7 +652,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
           {/* User Details Tabs Container */}
           <div className="mt-12">
             <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
-              
+
               {/* Left Column info details */}
               <div>
                 <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-[#161a2f] border border-indigo-950/60 px-4 py-1.5">
@@ -665,10 +661,10 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
                   {activeTab === 'admin' && <Settings className="h-5 w-5 text-indigo-400" />}
                   <span className="text-xs font-bold text-white">{selectedTabData.subtitle}</span>
                 </div>
-                
+
                 <h3 className="text-2xl font-bold text-white sm:text-3xl">{selectedTabData.title}</h3>
                 <p className="mt-4 text-sm md:text-base text-gray-400 leading-relaxed font-medium">{selectedTabData.description}</p>
-                
+
                 <ul className="mt-8 space-y-3">
                   {selectedTabData.features.map((feat, idx) => (
                     <li key={idx} className="flex items-center gap-3">
@@ -685,7 +681,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
               <div className="relative">
                 <div className="rounded-2xl border border-indigo-950 bg-[#16192a]/95 p-6 lg:p-8 backdrop-blur-md">
                   <div className="space-y-4">
-                    
+
                     <div className="rounded-xl bg-[#0d0f1c]/90 border border-indigo-950/50 p-4">
                       <p className="text-[10px] text-gray-500 font-extrabold uppercase tracking-widest mb-2">Exemple de requête</p>
                       <p className="text-[#f9fafb] font-semibold text-xs md:text-sm italic">{selectedTabData.query}</p>
@@ -725,7 +721,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
           {/* Step flow chart */}
           <div className="mt-16">
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              
+
               {/* Step 1 */}
               <div className="relative rounded-2xl border border-indigo-950 bg-[#16192a]/50 p-6">
                 <div className="mb-4 flex items-center justify-between">
@@ -781,7 +777,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
           <div className="mt-20">
             <h3 className="text-center text-lg md:text-xl font-bold text-white mb-8">Stack Technologique du Projet</h3>
             <div className="grid gap-6 md:grid-cols-3">
-              
+
               {/* Card 1 */}
               <div className="rounded-2xl border border-indigo-950 bg-[#16192a]/40 p-6">
                 <div className="mb-4 flex items-center gap-3">
@@ -907,7 +903,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
       {/* 6. Team Section ("À propos") */}
       <section id="about" className="relative py-28 bg-gradient-to-b from-transparent to-[#101221]/50 border-t border-indigo-950/40 scroll-mt-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          
+
           <div className="text-center">
             <p className="text-xs font-extrabold uppercase tracking-wider text-indigo-400">L'Équipe</p>
             <h2 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl tracking-tight">Les esprits derrière EstiNova</h2>
@@ -917,8 +913,8 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
           </div>
 
           {/* Core Members Grid Cards */}
-          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            
+          <div className="mt-16 grid gap-6 sm:grid-cols-2 max-w-4xl mx-auto">
+
             {/* Member 1: Badis */}
             <div className="group rounded-2xl border border-indigo-950/65 bg-[#161a2f]/40 p-6 transition-all hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5">
               <div className="mb-4 flex items-center gap-4">
@@ -927,17 +923,19 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm md:text-base">Boudjaoui Badis</h3>
-                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Chef de Projet & Ingénieur Logiciel</p>
+                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Chef de Projet & Ingénieur IA & Back-End</p>
                 </div>
               </div>
               <p className="text-xs md:text-sm text-gray-400 leading-relaxed min-h-[48px] font-medium">
-                Concepteur principal, orchestration du système et des modules intégrés, architecture ERP et supervision générale.
+                Concepteur principal, orchestration du système et des modules intégrés, architecture backend, ERP et supervision générale.
               </p>
               <div className="mt-4 flex gap-3 pt-3 border-t border-indigo-950/30">
-                <a href="https://github.com/Badis-Boudjaoui" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
+                {/* LIEN GITHUB POUR BADIS BOUDJAOUI (MODIFIER LE href CI-DESSOUS) */}
+                <a href="https://github.com/Shizu-ka-san" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
                   <Github className="h-4.5 w-4.5" />
                 </a>
-                <a href="https://linkedin.com/in/badis" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
+                {/* LIEN LINKEDIN POUR BADIS BOUDJAOUI (MODIFIER LE href CI-DESSOUS) */}
+                <a href="https://www.linkedin.com/in/badis-boudjaoui/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
                   <Linkedin className="h-4.5 w-4.5" />
                 </a>
               </div>
@@ -951,113 +949,17 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm md:text-base">Chiheb Israa</h3>
-                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Ingénieur R&D</p>
+                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Ingénieur IA & Front-End</p>
                 </div>
               </div>
               <p className="text-xs md:text-sm text-gray-400 leading-relaxed min-h-[48px] font-medium">
-                Développement backend avancé, configuration de l'indexation sémantique, optimisation de la base documentaire.
+                Développement de l'interface utilisateur, intégration des API web, configuration de l'indexation sémantique et des agents RAG.
               </p>
               <div className="mt-4 flex gap-3 pt-3 border-t border-indigo-950/30">
                 <a href="https://github.com/itsmeisraa" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
                   <Github className="h-4.5 w-4.5" />
                 </a>
                 <a href="https://www.linkedin.com/in/israa-chiheb-aaa3b837a/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Linkedin className="h-4.5 w-4.5" />
-                </a>
-              </div>
-            </div>
-
-            {/* Member 3: Wiam */}
-            <div className="group rounded-2xl border border-indigo-950/65 bg-[#161a2f]/40 p-6 transition-all hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5">
-              <div className="mb-4 flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
-                  <Palette className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm md:text-base">Gougam Wiam</h3>
-                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Frontend Developer</p>
-                </div>
-              </div>
-              <p className="text-xs md:text-sm text-gray-400 leading-relaxed min-h-[48px] font-medium">
-                Développement du portail et intégrations Web, maquettage UI/UX, structures adaptatives et réactives des interfaces.
-              </p>
-              <div className="mt-4 flex gap-3 pt-3 border-t border-indigo-950/30">
-                <a href="https://github.com/wiam-gm" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Github className="h-4.5 w-4.5" />
-                </a>
-                <a href="https://linkedin.com/in/wiam" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Linkedin className="h-4.5 w-4.5" />
-                </a>
-              </div>
-            </div>
-
-            {/* Member 4: Anias */}
-            <div className="group rounded-2xl border border-indigo-950/65 bg-[#161a2f]/40 p-6 transition-all hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5">
-              <div className="mb-4 flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
-                  <Server className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm md:text-base">Mansouri Anias</h3>
-                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Backend Developer</p>
-                </div>
-              </div>
-              <p className="text-xs md:text-sm text-gray-400 leading-relaxed min-h-[48px] font-medium">
-                Gestion de l'authentification silencieuse, conception des APIs, Webhooks, et sécurisation des protocoles d'échanges.
-              </p>
-              <div className="mt-4 flex gap-3 pt-3 border-t border-indigo-950/30">
-                <a href="https://github.com/anias" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Github className="h-4.5 w-4.5" />
-                </a>
-                <a href="https://linkedin.com/in/anias" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Linkedin className="h-4.5 w-4.5" />
-                </a>
-              </div>
-            </div>
-
-            {/* Member 5: Axcel */}
-            <div className="group rounded-2xl border border-indigo-950/65 bg-[#161a2f]/40 p-6 transition-all hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5">
-              <div className="mb-4 flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
-                  <Database className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm md:text-base">Hamadouche Axcel</h3>
-                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Data Analyst</p>
-                </div>
-              </div>
-              <p className="text-xs md:text-sm text-gray-400 leading-relaxed min-h-[48px] font-medium">
-                Nettoyage des tables de scolarité, restructuration de la base de données relationnelle, et intégrité des données d'études.
-              </p>
-              <div className="mt-4 flex gap-3 pt-3 border-t border-indigo-950/30">
-                <a href="https://github.com/Axcelcr7" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Github className="h-4.5 w-4.5" />
-                </a>
-                <a href="https://linkedin.com/in/axcel" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Linkedin className="h-4.5 w-4.5" />
-                </a>
-              </div>
-            </div>
-
-            {/* Member 6: Walid */}
-            <div className="group rounded-2xl border border-indigo-950/65 bg-[#161a2f]/40 p-6 transition-all hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5">
-              <div className="mb-4 flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
-                  <Shield className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm md:text-base">Naceri Walid</h3>
-                  <p className="text-[10px] md:text-xs text-indigo-400 font-bold uppercase tracking-widest">Data Analyst</p>
-                </div>
-              </div>
-              <p className="text-xs md:text-sm text-gray-400 leading-relaxed min-h-[48px] font-medium">
-                Alimentation et gestion fine du Vector Store, conformité RGPD, et analyse analytique des logs d'utilisation.
-              </p>
-              <div className="mt-4 flex gap-3 pt-3 border-t border-indigo-950/30">
-                <a href="https://github.com/walid" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
-                  <Github className="h-4.5 w-4.5" />
-                </a>
-                <a href="https://linkedin.com/in/walid" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">
                   <Linkedin className="h-4.5 w-4.5" />
                 </a>
               </div>
@@ -1072,7 +974,7 @@ export default function LandingPage({ onStartAuth }: LandingPageProps) {
       <footer className="border-t border-indigo-950 bg-[#0d0f1c] shrink-0">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-4">
-            
+
             <div className="lg:col-span-2">
               <div className="flex items-center gap-2">
                 <Logo size={32} variant="emblem" />
