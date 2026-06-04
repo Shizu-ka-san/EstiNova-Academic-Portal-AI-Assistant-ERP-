@@ -1,205 +1,511 @@
-# 🚀 EstiNova — Portail Académique & Assistant IA (ERP)
+# 🚀 EstiNova — Academic Portal & AI Assistant (ERP)
 
-> **Projet Pluridisciplinaire · ESTIN (Amizour, Béjaïa, Algérie) 2025/2026**  
-> ⚠️ **Statut : En cours de développement (Prototype)**
+<div align="center">
+
+![Status](https://img.shields.io/badge/Status-Prototype-orange?style=for-the-badge)
+![Academic Project](https://img.shields.io/badge/Academic%20Project-ESTIN-blue?style=for-the-badge)
+![AI Powered](https://img.shields.io/badge/AI-Powered-purple?style=for-the-badge)
+
+### 🏫 ESTIN — National Higher School of Computer Science
+
+### 📍 Amizour, Béjaïa, Algeria • Academic Year 2025/2026
+
+**A next-generation academic management platform powered by Artificial Intelligence**
+
+</div>
 
 ---
 
-## 🧠 Présentation Générale
+# 📖 Overview
 
-**EstiNova** est une plateforme moderne pour la gestion académique de l'ESTIN Béjaïa. Elle centralise les emplois du temps, les résultats des examens et les documents administratifs sous une interface fluide et unifiée, pilotée par un assistant IA intelligent.
+**EstiNova** is a modern academic management platform designed for ESTIN Béjaïa. It centralizes schedules, examination results, academic resources, and administrative services within a unified and intelligent platform.
 
-Au lieu de naviguer entre plusieurs fichiers PDF, emails ou groupes de communication, les étudiants et enseignants peuvent simplement interagir en langage naturel pour obtenir des informations personnalisées et sécurisées selon leur rôle.
+Powered by Artificial Intelligence, EstiNova enables students, professors, and administrators to interact naturally with institutional data through an AI assistant capable of understanding context, retrieving information, and automating academic workflows.
 
-### 💬 Interface Chat & Sélection de Rôle Dynamique
-L'utilisateur, une fois connecté sur le portail EstiNova, fait face à l'assistant IA et choisit activement le **rôle/workflow** (Étudiant, Enseignant, Administrateur) auquel envoyer sa requête directement via le sélecteur intégré dans la barre de saisie de l'interface de chat. Cela permet d'adapter instantanément les réponses de l'IA et de garantir une sécurité forte et ciblée.
+The platform aims to modernize academic management while ensuring security, scalability, and complete data sovereignty.
 
 ---
 
+# 💬 Dynamic Chat Interface & Role-Based Workflows
 
-## 🏗️ Architecture Globale & Flux de Communication
+Once authenticated on the EstiNova portal, users interact directly with the AI assistant and actively choose the workflow corresponding to their role.
 
-Le système repose sur une architecture modulaire découplée, où le **Frontend** joue le rôle de coordinateur entre l'orchestrateur IA (**n8n**) et les services d'authentification/stockage (**Supabase**).
+Supported workflows:
 
-### Diagramme d'Architecture
+* 🎓 Student
+* 👨‍🏫 Professor
+* 🏛️ Administrator
+
+The workflow selector is integrated directly inside the chat interface and determines which AI pipeline receives the request.
+
+This mechanism provides:
+
+* 🎯 Context-aware responses
+* 🔒 Strong access control
+* ⚡ Workflow specialization
+* 👤 Personalized user experiences
+
+---
+
+# 🏗️ System Architecture & Communication Flow
+
+EstiNova is built upon a modular and decoupled architecture where the Frontend acts as the secure intermediary between users, authentication services, and AI orchestration workflows.
+
+## 📐 Architecture Diagram
 
 ```mermaid
 graph TD
-    %% Frontend & Clients
-    subgraph Client [Interface Client]
+    subgraph Client [Client Interface]
         FE[Frontend - HTML/CSS/JS]
     end
 
-    %% API Proxy & Backend
-    subgraph Vercel [Hébergement & Proxy Vercel]
-        PX[API Proxy - api/proxy-webhook.js]
+    subgraph Vercel [Hosting & Proxy Layer]
+        PX[API Proxy]
     end
 
-    %% Supabase
-    subgraph Supa [Base de données & Auth]
-        SB[Supabase Auth & Storage]
+    subgraph Supabase [Authentication & Storage]
+        SB[Supabase Auth]
+        ST[Supabase Storage]
     end
 
-    %% n8n
-    subgraph n8n_Engine [Orchestration IA]
-        N8N[Workflow n8n]
-        Orch[Agent Orchestrateur]
-        T_Agent[Agent Emploi du Temps]
-        G_Agent[Agent Notes/Grades]
-        D_Agent[Agent RAG - Documentation]
+    subgraph AI [AI Orchestration]
+        N8N[n8n]
+        ORCH[Orchestrator Agent]
+        SCHED[Schedule Agent]
+        GRADES[Grades Agent]
+        DOCS[RAG Agent]
     end
 
-    %% Google Workspace & Services
-    subgraph Services [Sources de données / API]
+    subgraph Data [Data Sources]
         GS[Google Sheets]
         GD[Google Drive]
         GM[Gmail API]
+        QD[Qdrant]
     end
 
-    %% Flux
-    FE -->|1. Auth / Profil / Avatars| SB
-    FE -->|2. Requêtes IA POST /api/proxy-webhook| PX
-    PX -->|3. Forward Payload sécurisé| N8N
-    N8N -->|4. Orchestration| Orch
-    Orch --> T_Agent
-    Orch --> G_Agent
-    Orch --> D_Agent
-    T_Agent & G_Agent & D_Agent -->|5. Données / Outils| Services
+    FE --> SB
+    FE --> ST
+    FE --> PX
+    PX --> N8N
+
+    N8N --> ORCH
+    ORCH --> SCHED
+    ORCH --> GRADES
+    ORCH --> DOCS
+
+    SCHED --> GS
+    GRADES --> GS
+    DOCS --> QD
+    DOCS --> GD
+    ORCH --> GM
 ```
 
-![EstiNova Architecture Globale](./assets/architecture_diagram_1780528358298.png)
+---
 
-### 🔗 Fonctionnement des Connexions
+# 🔗 Connection Workflow
 
-1. **Frontend ↔ Proxy API** : Le Frontend communique avec l'API Serverless déployée sur Vercel (`api/proxy-webhook.js`) pour toutes les requêtes de chat. Cela protège les adresses réelles des serveurs n8n contre les attaques directes et ajoute une couche de protection contre le SSRF (Server-Side Request Forgery).
-2. **Proxy API ↔ Webhooks n8n** : Le Proxy transmet de manière sécurisée les payloads d'interaction utilisateur aux Webhooks n8n correspondants (`WEBHOOK_STUDENT`, `WEBHOOK_PROFESSOR`, `WEBHOOK_ADMIN`) en fonction du rôle activement sélectionné par l'utilisateur directement depuis l'interface de chat (Étudiant, Enseignant ou Administrateur).
-3. **Le rôle de n8n (Le Cerveau IA)** : 
-   - n8n héberge l'orchestrateur d'agents IA et les sous-agents spécialisés (résolution d'emplois du temps, recherche documentaire RAG, etc.).
-   - Il se connecte de manière autonome aux bases de données administratives (Google Sheets, Google Drive, Gmail API) pour récupérer et mettre à jour les données métiers en temps réel.
-4. **Le rôle de Supabase (Gestion Utilisateur & Profils)** : 
-   - Supabase est utilisé de manière autonome pour authentifier les sessions utilisateurs (adresse `@estin.dz`) et stocker les métadonnées de profil ainsi que les avatars.
-5. **Indépendance Supabase & n8n** : 
-   * **Important** : Supabase et n8n ne sont **pas connectés directement**. 
-   * C'est le **Frontend** qui fait le lien : il valide la session utilisateur auprès de Supabase, puis injecte le contexte de session sécurisé (Prénom, Nom, Rôle, Promotion, Section, Groupe) ainsi que le rôle sélectionné dans l'interface par l'utilisateur dans le payload envoyé au Proxy API pour n8n. Cela garantit un cloisonnement fort des responsabilités et une sécurité maximale.
+## 1️⃣ User Authentication
 
-### 📂 Choix de Google Workspace & Google Sheets
-Pour stocker et manipuler les plannings, les notes et les structures administratives, nous avons choisi d'intégrer **Google Sheets** via l'API Google Workspace. Ce choix est guidé par le fait que l'**ESTIN utilise déjà la suite Google Workspace** au quotidien. Utiliser Google Sheets comme référentiel de données permet aux équipes pédagogiques et administratives de modifier les données scolaires directement dans un outil collaboratif familier, évitant ainsi toute formation complexe ou friction technique liée à un nouvel outil de gestion de bases de données.
+The user authenticates using their institutional account through Supabase Authentication.
+
+After validation, a secure session is generated and stored.
 
 ---
 
-## 📖 Fonctionnement du RAG (Retrieval-Augmented Generation)
+## 2️⃣ Frontend Context Injection
 
-Pour répondre de manière fiable et précise aux questions des étudiants et des enseignants sur les règlements intérieurs, les chartes de l'école et la scolarité, EstiNova intègre un pipeline RAG (Génération Augmentée par Récupération) :
+The frontend retrieves user information and session data including:
 
-1. **Indexation & Stockage Vectoriel** : Les documents administratifs et académiques officiels (PDF, règlements) sont découpés en blocs de texte (chunking), convertis en vecteurs d'embeddings avec des modèles de HuggingFace, puis stockés localement dans la base de données vectorielle **Qdrant**.
-2. **Recherche Sémantique** : Lorsqu'un utilisateur pose une question (ex: *"Quel est le barème d'absence éliminatoire ?"*), le système recherche sémantiquement les passages textuels les plus pertinents dans Qdrant.
-3. **Génération Enrichie** : Le contexte extrait est fusionné avec la question initiale de l'utilisateur pour être soumis au LLM local, garantissant une réponse précise sans hallucinations, strictement ancrée dans la documentation officielle.
+* First Name
+* Last Name
+* Email
+* Role
+* Promotion
+* Section
+* Group
 
-![EstiNova RAG Pipeline](./assets/rag_pipeline_1780527716891.png)
-
----
-
-## 📊 Conception & Modélisation (UML & Base de Données)
-
-Pour structurer le développement et garantir la cohérence des flux de données de la plateforme, plusieurs diagrammes de conception ont été élaborés :
-
-### 1. Diagramme de Cas d'Utilisation (Use Case)
-Ce diagramme détaille les interactions possibles entre les différents acteurs (Étudiant, Enseignant, Administrateur) et l'assistant IA EstiNova.
-
-![Diagramme de Cas d'Utilisation](./assets/use_case_diagrame.png)
-
-### 2. Diagramme de Séquence
-Il illustre la chronologie des échanges de messages lors de l'interaction de chat, passant du Frontend au proxy Vercel, puis à l'orchestrateur n8n et aux bases de données.
-
-![Diagramme de Séquence](./assets/diagram_sequence%20.png)
-
-### 3. Diagramme de Classes (UML)
-Ce diagramme présente la structure statique du système, la définition des entités (Utilisateurs, Profils, Plannings, Notes) et leurs relations.
-
-![Diagramme de Classes UML](./assets/class_diagramme%20.png)
-
-### 4. Schéma de la Base de Données (Supabase)
-Voici la structure relationnelle des tables hébergées sur Supabase pour la gestion de l'authentification et des profils utilisateurs.
-
-![Schéma Base de Données Supabase](./assets/supabase-schema-wohmumhqolkmkegmltml.png)
+This information is attached to every AI request.
 
 ---
 
+## 3️⃣ API Proxy
 
+All requests pass through a secure API Proxy hosted on Vercel.
 
-## 🐳 Hébergement, Souveraineté & Mode Offline
+Responsibilities:
 
-Afin de garantir une **confidentialité et une souveraineté totale** des données académiques et personnelles de l'ESTIN, le projet adopte une philosophie d'hébergement local robuste :
-
-* **Conteneurisation Docker** : L'ensemble des briques technologiques du projet (l'application web, l'orchestrateur **n8n**, et la base de données vectorielle **Qdrant**) tourne localement au sein de conteneurs Docker pour simplifier le déploiement et assurer l'isolation.
-* **Exposition via ngrok** : Pour les phases de développement ou de test à distance, un tunnel sécurisé **ngrok** est configuré pour rendre l'application locale et ses webhooks visibles sur Internet.
-* **Déploiement sur site (On-Premise)** : En situation nominale, le projet est déployé localement sur les **serveurs physiques de l'ESTIN**.
-* **LLM Local (Contrôle Total)** : Pour le traitement intelligent, un modèle de langage (LLM) tourne en local sur les serveurs de l'ESTIN, garantissant un contrôle absolu des flux de données et une sécurité maximale sans dépendance externe.
-* **Validation & Tests** : Des tests approfondis ont été effectués directement sur les infrastructures de l'ESTIN, et les résultats obtenus ont été **plus que satisfaisants** (temps de latence réduit, résilience et précision du RAG).
-
----
-
-## 🛠️ Stack Technique
-
-| Composant | Technologie | Rôle / Description |
-| :--- | :--- | :--- |
-| **Frontend** | HTML, Vanilla CSS, Vite, TypeScript | Interface utilisateur moderne, réactive et animée |
-| **Authentification** | Supabase Auth (Silent Auth) | Restriction d'accès aux emails `@estin.dz` |
-| **Stockage** | Supabase Storage (avatars) | Hébergement sécurisé des photos de profil |
-| **API Proxy** | Vercel Serverless Function (Node.js) | Proxy sécurisé avec protection SSRF intégrée |
-| **Orchestration IA** | n8n (Self-hosted / Cloud) | Moteur d'agents, workflows et routage intelligent |
-| **Modèles LLM** | Stepfun 3.5 Flash / Gemini 2.0 | Génération de réponses et raisonnement d'agents |
-| **RAG (Documentation)** | HuggingFace API + Vector Store (n8n) | Recherche sémantique dans les règlements intérieurs |
-| **Bases de données Métier** | Google Sheets / SQL Supabase | Stockage des notes, des plannings et des structures |
+* Hide internal endpoints
+* Protect workflow URLs
+* Filter malicious requests
+* Apply SSRF protection
 
 ---
 
-## ⚙️ Installation & Démarrage en local
+## 4️⃣ AI Processing
 
-### Prérequis
-- **Node.js** (version 18 ou supérieure)
-- **npm** (inclus avec Node.js)
-- Une instance **n8n** (locale ou cloud) avec les workflows importés.
-- Un projet **Supabase** configuré.
+Validated requests are forwarded to n8n where AI orchestration begins.
 
-### Lancement étape par étape
-
-1. **Cloner le projet** et se placer à la racine :
-   ```bash
-   git clone <url-du-depot>
-   cd EstiNova
-   ```
-
-2. **Configurer l'application web** :
-   Allez dans le dossier `webapp` :
-   ```bash
-   cd webapp
-   ```
-   Créez un fichier `.env.local` en vous basant sur `.env.example` et complétez les variables :
-   ```env
-   VITE_SUPABASE_URL=https://votre-projet.supabase.co
-   VITE_SUPABASE_ANON_KEY=votre-cle-anon-supabase
-   ```
-
-3. **Installer les dépendances et démarrer** :
-   ```bash
-   npm install
-   # Lancer en mode développement
-   npm run dev
-   ```
-   L'application sera disponible sur [http://localhost:3000](http://localhost:3000).
+The Orchestrator Agent determines which specialized workflow should process the request.
 
 ---
 
-## 🔐 Sécurité & Bonnes Pratiques
+# 🔐 Authentication & Access Control
 
-- **Contrôle d'accès basé sur les rôles (RBAC)** : Les requêtes n8n injectent dynamiquement le profil utilisateur authentifié par Supabase. Un étudiant ne peut pas appeler les outils d'un professeur.
-- **SSRF Blocklist** : L'API proxy bloque toutes les requêtes vers des adresses IP locales (`127.0.0.1`, `localhost`, plages d'IP privées) pour interdire le scan de ports internes.
-- **Zéro Secret Commité** : Tous les secrets de production et clés d'API privées sont configurés sur les environnements de déploiement (Vercel, variables d'environnement de n8n) et exclus de Git via `.gitignore`.
+EstiNova implements a dual-layer authentication architecture based on a defense-in-depth security model.
 
 ---
 
-## 👨‍💻 Équipe Projet
+## Layer 1 — Supabase Authentication
 
-- **Boudjaoui Badis** — Chef de Projet & Ingénieur IA  
-- **Chiheb Israa** — Ingénieur IA (Prompting & RAG)  
+The first security layer is managed by Supabase Authentication.
+
+Users sign in using their institutional email account.
+
+Supabase handles:
+
+* User authentication
+* Session creation
+* Token management
+* User identity verification
+* Session restoration
+
+### Silent Authentication
+
+To improve user experience, EstiNova implements Silent Authentication.
+
+When a user revisits the platform:
+
+1. Supabase automatically restores the session.
+2. Credentials are verified in the background.
+3. User information is retrieved automatically.
+4. Access is granted instantly.
+
+Benefits:
+
+* ⚡ Faster access
+* 🔒 Secure session restoration
+* 👤 Personalized experience
+* 🚀 Seamless navigation
+
+---
+
+## Layer 2 — n8n Authentication & Authorization
+
+A second authentication layer is implemented directly inside n8n workflows.
+
+Possessing a valid Supabase session alone does not grant access to AI services.
+
+Before executing any workflow:
+
+1. The Frontend sends authenticated user information.
+2. n8n validates the received identity.
+3. Academic records are verified.
+4. Role permissions are checked.
+5. Workflow authorization is evaluated.
+
+This additional layer ensures that only authorized users can access protected resources.
+
+### Security Checks
+
+n8n verifies:
+
+* Email existence
+* Academic profile
+* User role
+* Promotion
+* Section
+* Group
+* Workflow permissions
+
+Unauthorized requests are immediately rejected.
+
+---
+
+## 🛡️ Security Auditing
+
+Every unauthorized access attempt is automatically logged.
+
+The audit system records:
+
+* Timestamp
+* Attempted email
+* Session identifier
+* Detected role
+* Event type
+
+This allows:
+
+* Security monitoring
+* Activity tracking
+* Incident investigation
+* Access auditing
+
+---
+
+## 🎯 Role-Based Access Control (RBAC)
+
+Supported roles:
+
+* 🎓 Student
+* 👨‍🏫 Professor
+* 🏛️ Administrator
+
+Each role is connected to dedicated workflows and authorized tools.
+
+This prevents:
+
+* Unauthorized access
+* Privilege escalation
+* Data leakage
+* Workflow abuse
+
+---
+
+# 📂 Why Google Workspace & Google Sheets?
+
+EstiNova integrates Google Workspace services as operational databases.
+
+The institution already relies heavily on Google Workspace for academic management.
+
+Using Google Sheets offers:
+
+* Familiar environment
+* Easy collaboration
+* Rapid updates
+* Minimal training requirements
+* Low operational cost
+
+The platform synchronizes academic data directly with Google Workspace services.
+
+---
+
+# 📚 Retrieval-Augmented Generation (RAG)
+
+To provide reliable answers regarding regulations, procedures, and academic policies, EstiNova implements a complete RAG pipeline.
+
+## 1️⃣ Data Ingestion
+
+Official documents including:
+
+* PDFs
+* Academic regulations
+* Administrative procedures
+* Internal guidelines
+
+are processed and indexed.
+
+---
+
+## 2️⃣ Embedding Generation
+
+Documents are:
+
+1. Split into chunks
+2. Converted into embeddings
+3. Stored inside Qdrant
+
+---
+
+## 3️⃣ Semantic Retrieval
+
+When a question is asked, the platform performs semantic search to retrieve the most relevant information.
+
+---
+
+## 4️⃣ Context-Enriched Generation
+
+Retrieved context is injected into the prompt before generation.
+
+Benefits:
+
+* Reduced hallucinations
+* Higher accuracy
+* Traceable responses
+* Official information grounding
+
+---
+
+# 📊 System Design & Modeling
+
+## 🎯 Use Case Diagram
+
+Illustrates interactions between:
+
+* Students
+* Professors
+* Administrators
+* AI Assistant
+
+---
+
+## 🔄 Sequence Diagram
+
+Represents communication between:
+
+Frontend → API Proxy → n8n → Data Sources
+
+---
+
+## 🧩 UML Class Diagram
+
+Describes:
+
+* Users
+* Profiles
+* Academic entities
+* Relationships
+
+---
+
+## 🗄️ Database Schema
+
+Supabase stores:
+
+* User accounts
+* Profiles
+* Metadata
+* Academic references
+
+---
+
+# ☸️ Hosting, Sovereignty & Offline Operation
+
+To guarantee privacy and institutional sovereignty, EstiNova follows a self-hosted architecture.
+
+---
+
+## ☸️ Kubernetes (K8s) Infrastructure
+
+All services are orchestrated using Kubernetes.
+
+Managed workloads include:
+
+* Frontend
+* API Proxy
+* n8n
+* Qdrant
+* Local LLM Services
+* Monitoring Services
+
+Advantages:
+
+* High availability
+* Self-healing deployments
+* Horizontal scalability
+* Centralized management
+* Production-grade reliability
+
+---
+
+## 🌐 ngrok Exposure
+
+During development and testing phases, ngrok tunnels securely expose local services and webhooks.
+
+---
+
+## 🏢 On-Premise Deployment
+
+Production deployment is performed directly on ESTIN infrastructure.
+
+This ensures:
+
+* Full control over infrastructure
+* Institutional sovereignty
+* Regulatory compliance
+
+---
+
+## 🤖 Local AI Models
+
+Local Large Language Models can operate entirely on ESTIN infrastructure.
+
+Benefits:
+
+* No dependency on external providers
+* Maximum privacy
+* Full control over data
+
+---
+
+## ✅ Validation & Testing
+
+Extensive testing demonstrated:
+
+* Low latency
+* High resilience
+* Stable orchestration
+* Reliable retrieval quality
+* Secure authentication workflows
+
+---
+
+# 🛠️ Technology Stack
+
+| Component           | Technology                            | Purpose                          |
+| ------------------- | ------------------------------------- | -------------------------------- |
+| 🎨 Frontend         | HTML, CSS, Vite, TypeScript           | Modern responsive interface      |
+| 🔐 Authentication   | Supabase Auth (Silent Authentication) | Session and identity management  |
+| 🗂️ Storage         | Supabase Storage                      | Avatar and file storage          |
+| 🔄 API Proxy        | Vercel Serverless Functions           | Secure request forwarding        |
+| 🧠 AI Orchestration | n8n                                   | Agents, workflows and routing    |
+| 🤖 LLM Models       | Local LLM / Gemini 2.0                | AI reasoning and generation      |
+| 📚 RAG              | HuggingFace Embeddings + Qdrant       | Semantic retrieval               |
+| ☸️ Infrastructure   | Kubernetes (K8s)                      | Container orchestration          |
+| 📦 Containerization | Docker                                | Application packaging            |
+| 📊 Academic Data    | Google Sheets                         | Schedules, grades and structures |
+| 📁 Documents        | Google Drive                          | Academic resources               |
+| 📧 Communication    | Gmail API                             | Notifications and automation     |
+
+---
+
+# 🔐 Security & Best Practices
+
+### 🛡️ Defense-in-Depth Security
+
+Authentication is enforced at multiple layers:
+
+* Supabase Authentication
+* n8n Authorization
+* Workflow Validation
+* RBAC Enforcement
+
+---
+
+### 🚫 SSRF Protection
+
+The API Proxy blocks requests targeting:
+
+* localhost
+* 127.0.0.1
+* Private network ranges
+
+---
+
+### 🔑 Zero Secret Commit Policy
+
+Secrets are:
+
+* Stored in deployment environments
+* Never committed to Git repositories
+* Excluded through `.gitignore`
+
+---
+
+# 👨‍💻 Team
+
+* **Boudjaoui Badis** — Project Manager, AI Engineer & Back-End Developer
+* **Chiheb Israa** — AI Engineer & Front-End Developer
+
+> Special thanks to Chiheb Israa for her professionalism and valuable contribution throughout the development of the project.
+
+---
+
+<div align="center">
+
+# ⭐ EstiNova
+
+### Reimagining Academic Management Through Artificial Intelligence
+
+Built for ESTIN
+
+</div>
