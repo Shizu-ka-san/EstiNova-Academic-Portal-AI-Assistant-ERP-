@@ -24,6 +24,7 @@ Powered by Artificial Intelligence, EstiNova enables students, professors, and a
 
 The platform aims to modernize academic management while ensuring security, scalability, and complete data sovereignty.
 
+
 ---
 
 # 💬 Dynamic Chat Interface & Role-Based Workflows
@@ -52,6 +53,8 @@ This mechanism provides:
 EstiNova is built upon a modular and decoupled architecture where the Frontend acts as the secure intermediary between users, authentication services, and AI orchestration workflows.
 
 ## 📐 Architecture Diagram
+
+![archi](https://github.com/Shizu-ka-san/EstiNova-Academic-Portal-AI-Assistant-ERP-/blob/main/assets/architecture_diagram_1780528358298.png)
 
 ```mermaid
 graph TD
@@ -281,6 +284,8 @@ The platform synchronizes academic data directly with Google Workspace services.
 
 # 📚 Retrieval-Augmented Generation (RAG)
 
+![archi](https://github.com/Shizu-ka-san/EstiNova-Academic-Portal-AI-Assistant-ERP-/blob/main/assets/rag_pipeline_1780527716891.png)
+
 To provide reliable answers regarding regulations, procedures, and academic policies, EstiNova implements a complete RAG pipeline.
 
 ## 1️⃣ Data Ingestion
@@ -329,6 +334,8 @@ Benefits:
 
 ## 🎯 Use Case Diagram
 
+![archi](https://github.com/Shizu-ka-san/EstiNova-Academic-Portal-AI-Assistant-ERP-/blob/main/assets/use_case_diagrame.png)
+
 Illustrates interactions between:
 
 * Students
@@ -340,6 +347,8 @@ Illustrates interactions between:
 
 ## 🔄 Sequence Diagram
 
+![archi](https://github.com/Shizu-ka-san/EstiNova-Academic-Portal-AI-Assistant-ERP-/blob/main/assets/diagram_sequence%20.png)
+
 Represents communication between:
 
 Frontend → API Proxy → n8n → Data Sources
@@ -347,6 +356,8 @@ Frontend → API Proxy → n8n → Data Sources
 ---
 
 ## 🧩 UML Class Diagram
+
+![archi](https://github.com/Shizu-ka-san/EstiNova-Academic-Portal-AI-Assistant-ERP-/blob/main/assets/class_diagramme%20.png)
 
 Describes:
 
@@ -358,6 +369,8 @@ Describes:
 ---
 
 ## 🗄️ Database Schema
+
+![archi](https://github.com/Shizu-ka-san/EstiNova-Academic-Portal-AI-Assistant-ERP-/blob/main/assets/supabase-schema-wohmumhqolkmkegmltml.png)
 
 Supabase stores:
 
